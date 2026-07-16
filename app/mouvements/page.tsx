@@ -178,11 +178,11 @@ export default function MouvementsPage() {
               <ArrowLeftRight className="w-3.5 h-3.5" />
               Type de flux
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setMovementType("Sortie")}
-                className={`py-4 rounded-xl font-bold text-[15px] transition-all duration-300 active:scale-[0.98] ${
+                className={`py-4 px-3 rounded-xl font-bold text-[15px] transition-all duration-300 active:scale-[0.98] ${
                   movementType === "Sortie"
                     ? "bg-[#F6F0FF] text-[#6E3FF3] border-2 border-[#6E3FF3] shadow-md shadow-[#6E3FF3]/5"
                     : "bg-[#FAF6EE] text-[#8A7F6E] border border-[#E5E0D5] hover:bg-[#F0EAE0]"
@@ -193,7 +193,7 @@ export default function MouvementsPage() {
               <button
                 type="button"
                 onClick={() => setMovementType("Entrée")}
-                className={`py-4 rounded-xl font-bold text-[15px] transition-all duration-300 active:scale-[0.98] ${
+                className={`py-4 px-3 rounded-xl font-bold text-[15px] transition-all duration-300 active:scale-[0.98] ${
                   movementType === "Entrée"
                     ? "bg-[#EDFBF3] text-[#0A8543] border-2 border-[#0A8543] shadow-md shadow-[#0A8543]/5"
                     : "bg-[#FAF6EE] text-[#8A7F6E] border border-[#E5E0D5] hover:bg-[#F0EAE0]"
