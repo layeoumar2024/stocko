@@ -68,10 +68,12 @@
 
 /* Mobile Menu Backdrop & Panel */
 .landing-mobile-menu-overlay {
-  @apply fixed inset-0 bg-black/60 backdrop-blur-xs z-40 transition-opacity duration-300 md:hidden;
+  @apply fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden;
+  animation: fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .landing-mobile-menu-panel {
-  @apply fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 p-6 flex flex-col justify-between transition-transform duration-300 ease-in-out md:hidden;
+  @apply fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 p-6 flex flex-col justify-between overflow-y-auto md:hidden;
+  animation: slide-in-right 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Hero Section */
@@ -254,10 +256,10 @@
   @apply flex items-center gap-3 text-gray-300 font-medium;
 }
 .landing-price-btn-free {
-  @apply w-full border-2 border-[#064e3b] text-[#064e3b] hover:bg-[#064e3b]/5 font-bold py-4 rounded-xl transition-all active:scale-[0.98] cursor-pointer text-center text-sm;
+  @apply inline-flex items-center justify-center w-full border-2 border-[#064e3b] text-[#064e3b] hover:bg-[#064e3b]/5 font-bold py-4 rounded-xl transition-all active:scale-[0.98] cursor-pointer text-center text-sm;
 }
 .landing-price-btn-pro {
-  @apply w-full bg-[#fd761a] hover:bg-[#9d4300] text-white font-bold py-4 rounded-xl shadow-md transition-all active:scale-[0.98] cursor-pointer text-center text-sm;
+  @apply inline-flex items-center justify-center w-full bg-[#fd761a] hover:bg-[#9d4300] text-white font-bold py-4 rounded-xl shadow-md transition-all active:scale-[0.98] cursor-pointer text-center text-sm;
 }
 
 /* Testimonial Section */

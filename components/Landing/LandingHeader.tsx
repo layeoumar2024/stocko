@@ -10,49 +10,51 @@ export default function LandingHeader() {
   const { user } = useStock();
 
   return (
-    <header className="landing-header">
-      <div className="landing-header-container">
-        {/* Logo */}
-        <Link href="/" className="landing-logo">
-          <Boxes className="w-8 h-8 text-[#fd761a]" />
-          <span>Stocko</span>
-        </Link>
+    <>
+      <header className="landing-header">
+        <div className="landing-header-container">
+          {/* Logo */}
+          <Link href="/" className="landing-logo">
+            <Boxes className="w-8 h-8 text-[#fd761a]" />
+            <span>Stocko</span>
+          </Link>
 
-        {/* Desktop Nav */}
-        <nav className="landing-nav">
-          <a href="#features" className="landing-nav-link">Fonctionnalités</a>
-          <a href="#pricing" className="landing-nav-link">Tarifs</a>
-          <a href="#faq" className="landing-nav-link">FAQ</a>
-        </nav>
+          {/* Desktop Nav */}
+          <nav className="landing-nav">
+            <a href="#features" className="landing-nav-link">Fonctionnalités</a>
+            <a href="#pricing" className="landing-nav-link">Tarifs</a>
+            <a href="#faq" className="landing-nav-link">FAQ</a>
+          </nav>
 
-        {/* Actions */}
-        <div className="landing-header-actions">
-          {user ? (
-            <Link href="/dashboard" className="landing-btn-free flex items-center gap-1.5">
-              <span>Mon Espace</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          ) : (
-            <>
-              <Link href="/connexion" className="landing-btn-connexion">
-                Connexion
+          {/* Actions */}
+          <div className="landing-header-actions">
+            {user ? (
+              <Link href="/dashboard" className="landing-btn-free flex items-center gap-1.5">
+                <span>Mon Espace</span>
+                <ArrowRight className="w-4 h-4" />
               </Link>
-              <Link href="/connexion?mode=onboarding" className="landing-btn-free">
-                Essayer gratuitement
-              </Link>
-            </>
-          )}
+            ) : (
+              <>
+                <Link href="/connexion" className="landing-btn-connexion">
+                  Connexion
+                </Link>
+                <Link href="/connexion?mode=onboarding" className="landing-btn-free hidden sm:inline-block">
+                  Essayer gratuitement
+                </Link>
+              </>
+            )}
 
-          {/* Burger menu toggler */}
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="landing-menu-toggle"
-            aria-label="Open Mobile Menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+            {/* Burger menu toggler */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="landing-menu-toggle"
+              aria-label="Open Mobile Menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Mobile Menu Backdrop & Panel */}
       {mobileMenuOpen && (
@@ -137,6 +139,6 @@ export default function LandingHeader() {
           </div>
         </>
       )}
-    </header>
+    </>
   );
 }
