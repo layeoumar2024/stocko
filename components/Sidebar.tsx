@@ -33,7 +33,7 @@ export default function Sidebar() {
   const menuItems = [
     {
       name: "Tableau de bord",
-      href: "/",
+      href: "/dashboard",
       icon: Grid,
     },
     {
@@ -141,8 +141,8 @@ export default function Sidebar() {
             <nav className="space-y-1.5">
               {menuItems.map((item) => {
                 // Active check: matches path exactly or starts with href for subpages
-                const isActive = item.href === "/" 
-                  ? pathname === "/" 
+                const isActive = item.href === "/dashboard" 
+                  ? pathname === "/dashboard" 
                   : pathname.startsWith(item.href);
                 
                 const Icon = item.icon;

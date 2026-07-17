@@ -11,7 +11,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (user && pathname === "/connexion") {
-      router.push("/");
+      router.push("/dashboard");
     } else if (!user && pathname !== "/connexion") {
       router.push("/connexion");
     }

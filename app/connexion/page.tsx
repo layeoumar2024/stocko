@@ -134,7 +134,7 @@ export default function ConnexionPage() {
 
       // Redirect after success animation
       setTimeout(() => {
-        router.push("/");
+        router.push("/dashboard");
       }, 1500);
     } catch (err: any) {
       setErrorMsg(err.message || "Une erreur est survenue lors de la connexion.");
@@ -365,7 +365,7 @@ export default function ConnexionPage() {
 
       // Redirect to Dashboard after 1.8s
       setTimeout(() => {
-        router.push("/");
+        router.push("/dashboard");
       }, 1800);
     } catch (err: any) {
       setErrorMsg(err.message || "Une erreur est survenue lors de la configuration de votre boutique.");
