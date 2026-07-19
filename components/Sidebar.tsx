@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { 
   Lock, 
   Grid, 
@@ -18,14 +18,40 @@ import {
 import { useStock } from "@/context/StockContext";
 import { supabase } from "@/lib/supabase";
 
+const subscribeOnlineStatus = (callback: () => void) => {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+};
+
+const getOnlineStatusSnapshot = () => {
+  return navigator.onLine;
+};
+
+const getOnlineStatusServerSnapshot = () => {
+  return true;
+};
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const { products, profile, user, syncStatus } = useStock();
 
+  const isOnline = useSyncExternalStore(
+    subscribeOnlineStatus,
+    getOnlineStatusSnapshot,
+    getOnlineStatusServerSnapshot
+  );
+
   // Auto-close sidebar on mobile when navigating
   useEffect(() => {
-    setIsOpen(false);
+    const timer = setTimeout(() => {
+      setIsOpen(false);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   const alertCount = products.filter((p) => p.stock <= p.threshold).length;
@@ -59,6 +85,24 @@ export default function Sidebar() {
     },
   ];
 
+  const renderConnectionStatus = () => {
+    if (isOnline) {
+      return (
+        <div className="flex items-center gap-1.5 text-[#0A8543] bg-[#EDFBF3]/10 border border-[#0A8543]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#0A8543]" />
+          <span>En ligne</span>
+        </div>
+      );
+    } else {
+      return (
+        <div className="flex items-center gap-1.5 text-[#D9381E] bg-[#FFF0F0]/10 border border-[#D9381E]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap animate-pulse">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
+          <span>Hors ligne</span>
+        </div>
+      );
+    }
+  };
+
   const renderSyncStatus = (compact: boolean) => {
     switch (syncStatus) {
       case "synced":
@@ -77,16 +121,16 @@ export default function Sidebar() {
         );
       case "offline-pending":
         return (
-          <div className="flex items-center gap-1.5 text-[#E5A93C] bg-[#FFF8E6]/5 border border-[#E5A93C]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#E5A93C] animate-pulse" />
+          <div className="flex items-center gap-1.5 text-[#D9381E] bg-[#FFF0F0]/10 border border-[#D9381E]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
             {!compact && <span>Hors ligne (Attente)</span>}
           </div>
         );
       case "offline":
       default:
         return (
-          <div className="flex items-center gap-1.5 text-white/45 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-white/35" />
+          <div className="flex items-center gap-1.5 text-[#D9381E] bg-[#FFF0F0]/10 border border-[#D9381E]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
             {!compact && <span>Hors ligne</span>}
           </div>
         );
@@ -102,7 +146,10 @@ export default function Sidebar() {
             S
           </div>
           <span className="text-lg font-bold tracking-wide">Stocko</span>
-          {renderSyncStatus(false)}
+          <div className="flex items-center gap-1.5">
+            {renderConnectionStatus()}
+            {renderSyncStatus(true)}
+          </div>
         </div>
         <button 
           onClick={() => setIsOpen(true)}
@@ -133,7 +180,10 @@ export default function Sidebar() {
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-wide leading-tight">Stocko</span>
-              <div className="mt-1">{renderSyncStatus(false)}</div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {renderConnectionStatus()}
+                {renderSyncStatus(false)}
+              </div>
             </div>
           </div>
           <button 

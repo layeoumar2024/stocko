@@ -43,6 +43,24 @@ export interface SyncQueueItem {
   timestamp: number;
 }
 
+export class InsufficientStockError extends Error {
+  productName: string;
+  availableStock: number;
+  requestedQty: number;
+  missingQty: number;
+  isInsufficientStockError: boolean = true;
+
+  constructor(productName: string, availableStock: number, requestedQty: number) {
+    super("Opération impossible : le stock disponible est insuffisant.");
+    this.name = "InsufficientStockError";
+    this.productName = productName;
+    this.availableStock = availableStock;
+    this.requestedQty = requestedQty;
+    this.missingQty = requestedQty - availableStock;
+    Object.setPrototypeOf(this, InsufficientStockError.prototype);
+  }
+}
+
 interface StockContextType {
   products: Product[];
   movements: Movement[];
@@ -354,44 +372,48 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
               if (isNetworkError(fetchErr)) throw fetchErr;
               console.error("[Sync Engine] DB error fetching product stock for movement:", fetchErr.message);
             } else if (serverProd) {
-              const change = type === "Entrée" ? quantity : -quantity;
-              const newStock = Math.max(0, serverProd.stock + change);
+              if (type === "Sortie" && quantity > serverProd.stock) {
+                console.warn(`[Sync Engine] Concurrency conflict: Insufficient stock on server. Available: ${serverProd.stock}, Requested: ${quantity}. Skipping sync.`);
+              } else {
+                const change = type === "Entrée" ? quantity : -quantity;
+                const newStock = Math.max(0, serverProd.stock + change);
 
-              // 2. Update stock on server
-              const { error: updateErr } = await supabase
-                .from("products")
-                .update({ stock: newStock })
-                .eq("id", productId);
+                // 2. Update stock on server
+                const { error: updateErr } = await supabase
+                  .from("products")
+                  .update({ stock: newStock })
+                  .eq("id", productId);
 
-              if (updateErr) {
-                if (isNetworkError(updateErr)) throw updateErr;
-                console.error("[Sync Engine] DB error updating product stock for movement:", updateErr.message);
-              }
-            }
+                if (updateErr) {
+                  if (isNetworkError(updateErr)) throw updateErr;
+                  console.error("[Sync Engine] DB error updating product stock for movement:", updateErr.message);
+                } else {
+                  // 3. Insert movement record
+                  const { data, error } = await supabase
+                    .from("movements")
+                    .insert({
+                      product_id: productId,
+                      type,
+                      quantity,
+                      time,
+                      note: note || null,
+                    })
+                    .select()
+                    .single();
 
-            // 3. Insert movement record
-            const { data, error } = await supabase
-              .from("movements")
-              .insert({
-                product_id: productId,
-                type,
-                quantity,
-                time,
-                note: note || null,
-              })
-              .select()
-              .single();
-
-            if (error) {
-              if (isNetworkError(error)) throw error;
-              console.error("[Sync Engine] DB error inserting movement, skipping:", error.message);
-            } else if (data) {
-              const realMovId = data.id;
-              const currentMovsStr = localStorage.getItem("stocko_movements");
-              if (currentMovsStr) {
-                const movs: Movement[] = JSON.parse(currentMovsStr);
-                const updated = movs.map((m) => (m.id === tempId ? { ...m, id: realMovId } : m));
-                saveMovements(updated);
+                  if (error) {
+                    if (isNetworkError(error)) throw error;
+                    console.error("[Sync Engine] DB error inserting movement, skipping:", error.message);
+                  } else if (data) {
+                    const realMovId = data.id;
+                    const currentMovsStr = localStorage.getItem("stocko_movements");
+                    if (currentMovsStr) {
+                      const movs: Movement[] = JSON.parse(currentMovsStr);
+                      const updated = movs.map((m) => (m.id === tempId ? { ...m, id: realMovId } : m));
+                      saveMovements(updated);
+                    }
+                  }
+                }
               }
             }
           }
@@ -751,6 +773,10 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
 
     const product = products.find((p) => p.id === productId);
     if (!product) return;
+
+    if (type === "Sortie" && quantity > product.stock) {
+      throw new InsufficientStockError(product.name, product.stock, quantity);
+    }
 
     const change = type === "Entrée" ? quantity : -quantity;
     const newStock = Math.max(0, product.stock + change);

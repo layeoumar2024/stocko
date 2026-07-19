@@ -1,7 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
+
+const subscribeOnlineStatus = (callback: () => void) => {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+};
+
+const getOnlineStatusSnapshot = () => {
+  return navigator.onLine;
+};
+
+const getOnlineStatusServerSnapshot = () => {
+  return true;
+};
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -15,7 +32,7 @@ import {
   Layers,
   ArrowLeftRight
 } from "lucide-react";
-import { useStock } from "@/context/StockContext";
+import { useStock, InsufficientStockError } from "@/context/StockContext";
 
 const formatRelativeTime = (isoString: string) => {
   try {
@@ -34,8 +51,105 @@ const formatRelativeTime = (isoString: string) => {
   }
 };
 
+const formatWeekdayFrench = (date: Date) => {
+  const weekdays = [
+    "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"
+  ];
+  const months = [
+    "janvier", "février", "mars", "avril", "mai", "juin", 
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+  ];
+  const weekday = weekdays[date.getDay()];
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  return `${weekday} ${day} ${month}`;
+};
+
+const formatDateFrench = (date: Date) => {
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const months = [
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+  ];
+  const month = months[date.getMonth()];
+  return `${day} ${month} ${year}`;
+};
+
 export default function Home() {
-  const { products, movements, addProduct, addMovement, profile } = useStock();
+  const { products, movements, addProduct, addMovement, profile, syncStatus } = useStock();
+  const [mounted, setMounted] = useState(false);
+  const [validationError, setValidationError] = useState<{
+    productName: string;
+    availableStock: number;
+    requestedQty: number;
+    missingQty: number;
+  } | null>(null);
+
+  const isOnline = useSyncExternalStore(
+    subscribeOnlineStatus,
+    getOnlineStatusSnapshot,
+    getOnlineStatusServerSnapshot
+  );
+
+  const renderConnectionStatus = () => {
+    if (isOnline) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#EDFBF3] text-[#0A8543] border border-[#0A8543]/20 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#0A8543]" />
+          En ligne
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFF0F0] text-[#D9381E] border border-[#D9381E]/20 shadow-xs animate-pulse">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
+          Hors ligne
+        </span>
+      );
+    }
+  };
+
+  const renderSyncStatusBadge = () => {
+    switch (syncStatus) {
+      case "synced":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#EDFBF3] text-[#0A8543] border border-[#0A8543]/20 shadow-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0A8543]" />
+            Synchronisé
+          </span>
+        );
+      case "syncing":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFF8E6] text-[#B25E00] border border-[#B25E00]/20 shadow-xs animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#B25E00]" />
+            Sync en cours...
+          </span>
+        );
+      case "offline-pending":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFF0F0] text-[#D9381E] border border-[#D9381E]/20 shadow-xs animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
+            Hors ligne (Attente)
+          </span>
+        );
+      case "offline":
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFF0F0] text-[#D9381E] border border-[#D9381E]/20 shadow-xs animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
+            Hors ligne
+          </span>
+        );
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Derived stats
   const totalProducts = products.length;
@@ -69,15 +183,35 @@ export default function Home() {
   });
 
   // Handlers
-  const handleAddMovement = (e: React.FormEvent) => {
+  const handleAddMovement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMovement.productId || !newMovement.quantity) return;
 
     const qty = parseInt(newMovement.quantity);
-    addMovement(newMovement.productId, newMovement.type, qty, "Saisie rapide Dashboard");
 
-    setIsMovementModalOpen(false);
-    setNewMovement({ productId: "", type: "Sortie", quantity: "" });
+    try {
+      await addMovement(newMovement.productId, newMovement.type, qty, "Saisie rapide Dashboard");
+      setIsMovementModalOpen(false);
+      setNewMovement({ productId: "", type: "Sortie", quantity: "" });
+      setValidationError(null);
+    } catch (err: unknown) {
+      const isStockError = err instanceof InsufficientStockError || 
+        (err instanceof Error && err.name === "InsufficientStockError") ||
+        (err && typeof err === "object" && (err as any).isInsufficientStockError === true);
+
+      if (isStockError) {
+        const stockErr = err as any;
+        setIsMovementModalOpen(false);
+        setValidationError({
+          productName: stockErr.productName,
+          availableStock: stockErr.availableStock,
+          requestedQty: stockErr.requestedQty,
+          missingQty: stockErr.missingQty,
+        });
+      } else {
+        console.error("Erreur de mouvement:", err);
+      }
+    }
   };
 
   const handleAddProduct = (e: React.FormEvent) => {
@@ -111,18 +245,24 @@ export default function Home() {
           <div className="text-xs font-bold tracking-widest text-[#8A7F6E] uppercase mb-1">
             Vue d'ensemble
           </div>
-          <h1 className="text-3xl font-extrabold text-brand-blue flex items-center gap-2">
+          <h1 className="text-3xl font-extrabold text-brand-blue flex flex-wrap items-center gap-2">
             Bonjour, {profile.userName} <span className="animate-wiggle inline-block">👋</span>
+            {mounted && (
+              <span className="inline-flex items-center gap-2 ml-1">
+                {renderConnectionStatus()}
+                {renderSyncStatusBadge()}
+              </span>
+            )}
           </h1>
           <p className="text-sm text-[#8A7F6E] mt-1 font-medium">
-            Voici l'état de votre stock aujourd'hui, mercredi 12 juillet.
+            Voici l'état de votre stock aujourd'hui{mounted ? `, ${formatWeekdayFrench(new Date())}` : ""}.
           </p>
         </div>
 
         {/* Date Selector Badge */}
         <div className="flex items-center gap-2 bg-[#F0EAE0]/50 border border-[#E5E0D5] px-4 py-2 rounded-xl text-sm font-semibold text-brand-blue/80 self-start md:self-auto">
           <Calendar className="w-4 h-4 text-[#8A7F6E]" />
-          <span>12 Juillet 2026</span>
+          <span>{mounted ? formatDateFrench(new Date()) : "..."}</span>
         </div>
       </div>
 
@@ -477,6 +617,34 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {validationError && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white border border-[#E5E0D5] rounded-2xl shadow-2xl w-full max-w-md animate-slide-up flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="flex items-center gap-3 text-[#D9381E] mb-2">
+                <AlertCircle className="w-6 h-6 text-[#D9381E] shrink-0" />
+                <h3 className="text-base font-bold">Opération impossible : le stock disponible est insuffisant.</h3>
+              </div>
+              <div className="space-y-2.5 text-sm text-brand-blue/80 font-medium bg-[#FAF6EE] p-4 rounded-xl border border-[#E5E0D5]/50">
+                <div><strong>Produit concerné :</strong> {validationError.productName}</div>
+                <div><strong>Stock disponible :</strong> {validationError.availableStock}</div>
+                <div><strong>Quantité demandée :</strong> {validationError.requestedQty}</div>
+                <div className="text-[#D9381E]"><strong>Quantité manquante :</strong> {validationError.missingQty}</div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setValidationError(null)}
+                  className="bg-brand-blue text-white px-5 py-2.5 rounded-xl font-bold text-[14px] hover:bg-[#1a2c4e] transition-all active:scale-[0.97] cursor-pointer w-full sm:w-auto"
+                >
+                  Fermer et Ajuster
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

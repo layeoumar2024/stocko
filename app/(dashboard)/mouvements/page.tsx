@@ -10,9 +10,10 @@ import {
   Calendar,
   FileText,
   User,
-  Package
+  Package,
+  AlertCircle
 } from "lucide-react";
-import { useStock } from "@/context/StockContext";
+import { useStock, InsufficientStockError } from "@/context/StockContext";
 
 export default function MouvementsPage() {
   const { products, movements, addMovement } = useStock();
@@ -28,11 +29,20 @@ export default function MouvementsPage() {
   // UI state
   const [showDropdown, setShowDropdown] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [validationError, setValidationError] = useState<{
+    productName: string;
+    availableStock: number;
+    requestedQty: number;
+    missingQty: number;
+  } | null>(null);
 
   // Set default date to today (YYYY-MM-DD)
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
-    setDate(today);
+    const timer = setTimeout(() => {
+      setDate(today);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   // Filter products for autocomplete selection
@@ -54,26 +64,45 @@ export default function MouvementsPage() {
   };
 
   // Submit Handler
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProductId || quantity <= 0) return;
 
-    addMovement(selectedProductId, movementType, quantity, note, date);
+    try {
+      await addMovement(selectedProductId, movementType, quantity, note, date);
 
-    // Show Success Toast
-    const prodName = selectedProduct ? selectedProduct.name : "Produit";
-    setSuccessMessage(`${movementType === "Entrée" ? "Approvisionnement" : "Vente"} de ${quantity} ${prodName} enregistré !`);
-    
-    // Reset Form
-    setSelectedProductId("");
-    setSearchQuery("");
-    setQuantity(1);
-    setNote("");
-    
-    // Clear success message after 3 seconds
-    setTimeout(() => {
-      setSuccessMessage("");
-    }, 3000);
+      // Show Success Toast
+      const prodName = selectedProduct ? selectedProduct.name : "Produit";
+      setSuccessMessage(`${movementType === "Entrée" ? "Approvisionnement" : "Vente"} de ${quantity} ${prodName} enregistré !`);
+      setValidationError(null);
+      
+      // Reset Form
+      setSelectedProductId("");
+      setSearchQuery("");
+      setQuantity(1);
+      setNote("");
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage("");
+      }, 3000);
+    } catch (err: unknown) {
+      const isStockError = err instanceof InsufficientStockError || 
+        (err instanceof Error && err.name === "InsufficientStockError") ||
+        (err && typeof err === "object" && (err as any).isInsufficientStockError === true);
+
+      if (isStockError) {
+        const stockErr = err as any;
+        setValidationError({
+          productName: stockErr.productName,
+          availableStock: stockErr.availableStock,
+          requestedQty: stockErr.requestedQty,
+          missingQty: stockErr.missingQty,
+        });
+      } else {
+        console.error("Erreur de mouvement:", err);
+      }
+    }
   };
 
   // Get recent 5 movements
@@ -344,6 +373,34 @@ export default function MouvementsPage() {
           </div>
         </div>
       </div>
+
+      {validationError && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white border border-[#E5E0D5] rounded-2xl shadow-2xl w-full max-w-md animate-slide-up flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="flex items-center gap-3 text-[#D9381E] mb-2">
+                <AlertCircle className="w-6 h-6 text-[#D9381E] shrink-0" />
+                <h3 className="text-base font-bold">Opération impossible : le stock disponible est insuffisant.</h3>
+              </div>
+              <div className="space-y-2.5 text-sm text-brand-blue/80 font-medium bg-[#FAF6EE] p-4 rounded-xl border border-[#E5E0D5]/50">
+                <div><strong>Produit concerné :</strong> {validationError.productName}</div>
+                <div><strong>Stock disponible :</strong> {validationError.availableStock}</div>
+                <div><strong>Quantité demandée :</strong> {validationError.requestedQty}</div>
+                <div className="text-[#D9381E]"><strong>Quantité manquante :</strong> {validationError.missingQty}</div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setValidationError(null)}
+                  className="bg-brand-blue text-white px-5 py-2.5 rounded-xl font-bold text-[14px] hover:bg-[#1a2c4e] transition-all active:scale-[0.97] cursor-pointer w-full sm:w-auto"
+                >
+                  Fermer et Ajuster
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
