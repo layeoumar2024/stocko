@@ -166,6 +166,7 @@ export default function Home() {
   // Modals state
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [showMovementConfirmModal, setShowMovementConfirmModal] = useState(false);
 
   // Form states
   const [newMovement, setNewMovement] = useState({
@@ -182,9 +183,17 @@ export default function Home() {
     purchasePrice: "",
   });
 
+  const selectedProductForConfirm = products.find((p) => p.id === newMovement.productId);
+
   // Handlers
-  const handleAddMovement = async (e: React.FormEvent) => {
+  const handleAddMovement = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newMovement.productId || !newMovement.quantity) return;
+    setShowMovementConfirmModal(true);
+  };
+
+  const handleConfirmMovementSave = async () => {
+    setShowMovementConfirmModal(false);
     if (!newMovement.productId || !newMovement.quantity) return;
 
     const qty = parseInt(newMovement.quantity);
@@ -504,6 +513,62 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showMovementConfirmModal && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in animate-duration-200">
+          <div className="bg-white border border-[#E5E0D5] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-[#FAF6EE] flex items-center justify-between bg-[#FAF6EE]/50">
+              <h3 className="text-lg font-bold text-brand-blue flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-brand-accent animate-pulse" />
+                Confirmer le mouvement
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setShowMovementConfirmModal(false)}
+                className="text-[#8A7F6E] hover:text-brand-blue transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-brand-blue/80 font-medium">
+                Êtes-vous sûr de vouloir enregistrer ce mouvement de stock ?
+              </p>
+              
+              <div className="bg-[#FAF6EE] border border-[#E5E0D5]/50 rounded-xl p-4 space-y-2.5 text-sm font-semibold text-brand-blue">
+                <div><span className="text-[#8A7F6E]">Produit :</span> {selectedProductForConfirm?.name}</div>
+                <div>
+                  <span className="text-[#8A7F6E]">Type de flux :</span>{" "}
+                  {newMovement.type === "Entrée" ? (
+                    <span className="text-[#0A8543]">Entrée (Approvisionnement)</span>
+                  ) : (
+                    <span className="text-[#6E3FF3]">Sortie (Vente / Casse)</span>
+                  )}
+                </div>
+                <div><span className="text-[#8A7F6E]">Quantité :</span> {newMovement.quantity} {selectedProductForConfirm?.unit || "pièces"}</div>
+              </div>
+              
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowMovementConfirmModal(false)}
+                  className="flex-1 bg-[#FAF6EE] hover:bg-[#F0EAE0] text-[#8A7F6E] py-3 rounded-xl font-bold text-sm transition-colors cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmMovementSave}
+                  className="flex-1 bg-brand-blue hover:bg-[#1a2c4e] text-white py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] cursor-pointer"
+                >
+                  Confirmer
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

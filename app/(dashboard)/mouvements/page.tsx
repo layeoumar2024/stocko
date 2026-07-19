@@ -11,7 +11,8 @@ import {
   FileText,
   User,
   Package,
-  AlertCircle
+  AlertCircle,
+  X
 } from "lucide-react";
 import { useStock, InsufficientStockError } from "@/context/StockContext";
 
@@ -29,6 +30,7 @@ export default function MouvementsPage() {
   // UI state
   const [showDropdown, setShowDropdown] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [validationError, setValidationError] = useState<{
     productName: string;
     availableStock: number;
@@ -63,11 +65,16 @@ export default function MouvementsPage() {
     setShowDropdown(false);
   };
 
-  // Submit Handler
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Submit Handler - intercept to show confirmation first
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProductId || quantity <= 0) return;
+    setShowConfirmModal(true);
+  };
 
+  // Actual Save Handler
+  const handleConfirmSave = async () => {
+    setShowConfirmModal(false);
     try {
       await addMovement(selectedProductId, movementType, quantity, note, date);
 
@@ -373,6 +380,64 @@ export default function MouvementsPage() {
           </div>
         </div>
       </div>
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in animate-duration-200">
+          <div className="bg-white border border-[#E5E0D5] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-[#FAF6EE] flex items-center justify-between bg-[#FAF6EE]/50">
+              <h3 className="text-lg font-bold text-brand-blue flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-brand-accent animate-pulse" />
+                Confirmer le mouvement
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="text-[#8A7F6E] hover:text-brand-blue transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-brand-blue/80 font-medium">
+                Êtes-vous sûr de vouloir enregistrer ce mouvement de stock ?
+              </p>
+              
+              <div className="bg-[#FAF6EE] border border-[#E5E0D5]/50 rounded-xl p-4 space-y-2.5 text-sm font-semibold text-brand-blue">
+                <div><span className="text-[#8A7F6E]">Produit :</span> {selectedProduct?.name}</div>
+                <div>
+                  <span className="text-[#8A7F6E]">Type de flux :</span>{" "}
+                  {movementType === "Entrée" ? (
+                    <span className="text-[#0A8543]">Entrée (Réapprovisionnement)</span>
+                  ) : (
+                    <span className="text-[#6E3FF3]">Sortie (Vente / Perte)</span>
+                  )}
+                </div>
+                <div><span className="text-[#8A7F6E]">Quantité :</span> {quantity} {selectedProduct?.unit || "pièces"}</div>
+                {note && <div><span className="text-[#8A7F6E]">Note :</span> {note}</div>}
+                {date && <div><span className="text-[#8A7F6E]">Date d'effet :</span> {date}</div>}
+              </div>
+              
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 bg-[#FAF6EE] hover:bg-[#F0EAE0] text-[#8A7F6E] py-3 rounded-xl font-bold text-sm transition-colors cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSave}
+                  className="flex-1 bg-brand-blue hover:bg-[#1a2c4e] text-white py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] cursor-pointer"
+                >
+                  Confirmer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {validationError && (
         <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
