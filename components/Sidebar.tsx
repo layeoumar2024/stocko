@@ -21,7 +21,7 @@ import { supabase } from "@/lib/supabase";
 export default function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const { products, profile, user } = useStock();
+  const { products, profile, user, syncStatus } = useStock();
 
   // Auto-close sidebar on mobile when navigating
   useEffect(() => {
@@ -59,6 +59,40 @@ export default function Sidebar() {
     },
   ];
 
+  const renderSyncStatus = (compact: boolean) => {
+    switch (syncStatus) {
+      case "synced":
+        return (
+          <div className="flex items-center gap-1.5 text-[#0A8543] bg-[#EDFBF3]/10 border border-[#0A8543]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0A8543]" />
+            {!compact && <span>Synchronisé</span>}
+          </div>
+        );
+      case "syncing":
+        return (
+          <div className="flex items-center gap-1.5 text-[#B25E00] bg-[#FFF8E6]/10 border border-[#B25E00]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#B25E00] animate-pulse" />
+            {!compact && <span>Sync en cours...</span>}
+          </div>
+        );
+      case "offline-pending":
+        return (
+          <div className="flex items-center gap-1.5 text-[#E5A93C] bg-[#FFF8E6]/5 border border-[#E5A93C]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#E5A93C] animate-pulse" />
+            {!compact && <span>Hors ligne (Attente)</span>}
+          </div>
+        );
+      case "offline":
+      default:
+        return (
+          <div className="flex items-center gap-1.5 text-white/45 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-white/35" />
+            {!compact && <span>Hors ligne</span>}
+          </div>
+        );
+    }
+  };
+
   return (
     <>
       {/* Mobile Top Navbar */}
@@ -68,6 +102,7 @@ export default function Sidebar() {
             S
           </div>
           <span className="text-lg font-bold tracking-wide">Stocko</span>
+          {renderSyncStatus(false)}
         </div>
         <button 
           onClick={() => setIsOpen(true)}
@@ -96,7 +131,10 @@ export default function Sidebar() {
             <div className="w-9 h-9 bg-brand-accent rounded-lg flex items-center justify-center font-extrabold text-[#111E35] text-xl shadow-md">
               S
             </div>
-            <span className="text-xl font-bold tracking-wide">Stocko</span>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold tracking-wide leading-tight">Stocko</span>
+              <div className="mt-1">{renderSyncStatus(false)}</div>
+            </div>
           </div>
           <button 
             onClick={() => setIsOpen(false)}

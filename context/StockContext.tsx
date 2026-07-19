@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
@@ -34,18 +34,29 @@ export interface CompanyProfile {
   email?: string;
 }
 
+export type SyncStatus = "synced" | "syncing" | "offline" | "offline-pending";
+
+export interface SyncQueueItem {
+  id: string;
+  action: "ADD_PRODUCT" | "UPDATE_PRODUCT" | "DELETE_PRODUCT" | "ADD_MOVEMENT" | "UPDATE_PROFILE" | "IMPORT_PRODUCTS";
+  payload: any;
+  timestamp: number;
+}
+
 interface StockContextType {
   products: Product[];
   movements: Movement[];
   categories: string[];
   profile: CompanyProfile;
   user: User | null;
+  syncStatus: SyncStatus;
   addProduct: (product: Omit<Product, "id" | "status">) => Promise<void>;
   updateProduct: (id: string, updatedFields: Partial<Omit<Product, "id">>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   addMovement: (productId: string, type: "Entrée" | "Sortie", quantity: number, note?: string, date?: string) => Promise<void>;
   updateProfile: (profile: Partial<CompanyProfile>) => Promise<void>;
   importProducts: (newProducts: Omit<Product, "id" | "status">[], clearExisting?: boolean) => Promise<void>;
+  triggerSync: () => Promise<void>;
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -66,6 +77,10 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<CompanyProfile>(initialProfile);
   const [user, setUser] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced");
+  const [syncQueue, setSyncQueue] = useState<SyncQueueItem[]>([]);
+  
+  const isSyncingRef = useRef(false);
 
   // Helper to determine product status
   const calculateStatus = (stock: number, threshold: number): "critical" | "low" | "stable" => {
@@ -74,142 +89,496 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
     return "stable";
   };
 
-  // Helper to get active user (with session fallback to avoid React state race conditions)
+  // Helper to generate a temporary unique ID for offline objects
+  const generateTempId = (prefix: string = "temp") => {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  };
+
+  // Helper to check if an error is network related
+  const isNetworkError = (error: any): boolean => {
+    if (typeof window !== "undefined" && !navigator.onLine) return true;
+    const msg = error?.message?.toLowerCase() || "";
+    return msg.includes("failed to fetch") || 
+           msg.includes("network error") || 
+           msg.includes("network request failed") ||
+           msg.includes("load failed") ||
+           error?.status === 0 ||
+           error?.code === "PGRST" ||
+           error?.status === 502 ||
+           error?.status === 503 ||
+           error?.status === 504;
+  };
+
+  // Helper to save data with localStorage persistence
+  const saveProducts = (newProds: Product[]) => {
+    setProducts(newProds);
+    localStorage.setItem("stocko_products", JSON.stringify(newProds));
+  };
+
+  const saveMovements = (newMovs: Movement[]) => {
+    setMovements(newMovs);
+    localStorage.setItem("stocko_movements", JSON.stringify(newMovs));
+  };
+
+  const saveProfile = (newProfile: CompanyProfile) => {
+    setProfile(newProfile);
+    localStorage.setItem("stocko_profile", JSON.stringify(newProfile));
+  };
+
+  const saveQueue = (newQueue: SyncQueueItem[]) => {
+    setSyncQueue(newQueue);
+    localStorage.setItem("stocko_sync_queue", JSON.stringify(newQueue));
+  };
+
+  // Helper to get active user
   const getActiveUser = async (): Promise<User | null> => {
     if (user) return user;
     const { data: { session } } = await supabase.auth.getSession();
     return session?.user || null;
   };
 
-  // Load from Supabase on auth state change
-  useEffect(() => {
-    let active = true;
+  // Fetch fresh data from Supabase server
+  const loadFreshDataFromServer = async (userId: string, userEmail?: string) => {
+    try {
+      // 1. Fetch profile
+      const { data: profData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
 
-    async function loadData(userId: string, userEmail?: string) {
+      if (profData) {
+        const updatedProfile = {
+          name: profData.name,
+          sector: profData.sector || "Divers / Autre",
+          city: profData.city || "Ouagadougou",
+          userName: profData.user_name || "Utilisateur",
+          email: profData.email || userEmail || "",
+        };
+        saveProfile(updatedProfile);
+      } else {
+        // Create fallback profile in DB
+        const fallbackProfile = {
+          name: "Ma Boutique",
+          sector: "Divers / Autre",
+          city: "Ouagadougou",
+          userName: "Utilisateur",
+          email: userEmail || "",
+        };
+        
+        await supabase.from("profiles").insert({
+          id: userId,
+          name: fallbackProfile.name,
+          sector: fallbackProfile.sector,
+          city: fallbackProfile.city,
+          user_name: fallbackProfile.userName,
+          email: fallbackProfile.email,
+        });
+        
+        saveProfile(fallbackProfile);
+      }
+
+      // 2. Fetch products
+      const { data: prodsData } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (prodsData) {
+        const mappedProds: Product[] = prodsData.map((p) => ({
+          id: p.id,
+          name: p.name,
+          stock: p.stock,
+          threshold: p.threshold,
+          unit: p.unit || "pièces",
+          category: p.category || "Divers",
+          purchasePrice: Number(p.purchase_price),
+          sellPrice: Number(p.sell_price),
+          status: calculateStatus(p.stock, p.threshold),
+        }));
+        saveProducts(mappedProds);
+      }
+
+      // 3. Fetch movements
+      const { data: movsData } = await supabase
+        .from("movements")
+        .select(`
+          id,
+          type,
+          product_id,
+          quantity,
+          time,
+          note,
+          products ( name )
+        `)
+        .order("time", { ascending: false });
+
+      if (movsData) {
+        const mappedMovs: Movement[] = movsData.map((m) => ({
+          id: m.id,
+          type: m.type as "Entrée" | "Sortie",
+          productId: m.product_id,
+          productName: (m.products as any)?.name || "Produit inconnu",
+          quantity: m.quantity,
+          time: m.time,
+          note: m.note || undefined,
+        }));
+        saveMovements(mappedMovs);
+      }
+    } catch (e) {
+      console.error("Failed to load fresh data from server:", e);
+      throw e;
+    }
+  };
+
+  // Sync engine: processes the queue sequentially
+  const processSyncQueue = async (userId: string): Promise<boolean> => {
+    const queueStr = localStorage.getItem("stocko_sync_queue");
+    if (!queueStr) return true;
+    let queue: SyncQueueItem[] = JSON.parse(queueStr);
+    if (queue.length === 0) return true;
+
+    console.log(`[Sync Engine] Processing ${queue.length} items...`);
+
+    while (queue.length > 0) {
+      const item = queue[0];
+
+      if (typeof window !== "undefined" && !navigator.onLine) {
+        console.log("[Sync Engine] Offline detected, pausing sync.");
+        return false;
+      }
+
       try {
-        // 1. Fetch profile
-        const { data: profData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", userId)
-          .maybeSingle();
+        if (item.action === "ADD_PRODUCT") {
+          const { tempId, name, stock, threshold, unit, category, purchasePrice, sellPrice } = item.payload;
+          
+          const { data, error } = await supabase
+            .from("products")
+            .insert({
+              profile_id: userId,
+              name,
+              stock,
+              threshold,
+              unit,
+              category,
+              purchase_price: purchasePrice,
+              sell_price: sellPrice,
+            })
+            .select()
+            .single();
 
-        if (active) {
-          if (profData) {
-            setProfile({
-              name: profData.name,
-              sector: profData.sector || "Divers / Autre",
-              city: profData.city || "Ouagadougou",
-              userName: profData.user_name || "Utilisateur",
-              email: profData.email || userEmail || "",
+          if (error) {
+            if (isNetworkError(error)) throw error;
+            console.error("[Sync Engine] DB error adding product, skipping item:", error.message);
+          } else if (data) {
+            const realId = data.id;
+
+            // Replace tempId with realId in local products
+            const currentProdsStr = localStorage.getItem("stocko_products");
+            if (currentProdsStr) {
+              const prods: Product[] = JSON.parse(currentProdsStr);
+              const updated = prods.map((p) =>
+                p.id === tempId ? { ...p, id: realId, status: calculateStatus(p.stock, p.threshold) } : p
+              );
+              saveProducts(updated);
+            }
+
+            // Replace tempId with realId in local movements
+            const currentMovsStr = localStorage.getItem("stocko_movements");
+            if (currentMovsStr) {
+              const movs: Movement[] = JSON.parse(currentMovsStr);
+              const updated = movs.map((m) =>
+                m.productId === tempId ? { ...m, productId: realId } : m
+              );
+              saveMovements(updated);
+            }
+
+            // Update remaining queue payloads containing this tempId
+            queue = queue.map((q) => {
+              if (q.action === "UPDATE_PRODUCT" && q.payload.id === tempId) {
+                return { ...q, payload: { ...q.payload, id: realId } };
+              }
+              if (q.action === "DELETE_PRODUCT" && q.payload.id === tempId) {
+                return { ...q, payload: { ...q.payload, id: realId } };
+              }
+              if (q.action === "ADD_MOVEMENT" && q.payload.productId === tempId) {
+                return { ...q, payload: { ...q.payload, productId: realId } };
+              }
+              return q;
             });
-          } else {
-            // If profile does not exist in DB yet, create a default one
-            const fallbackProfile = {
-              name: "Ma Boutique",
-              sector: "Divers / Autre",
-              city: "Ouagadougou",
-              userName: "Utilisateur",
-              email: userEmail || "",
-            };
-            
-            await supabase.from("profiles").insert({
-              id: userId,
-              name: fallbackProfile.name,
-              sector: fallbackProfile.sector,
-              city: fallbackProfile.city,
-              user_name: fallbackProfile.userName,
-              email: fallbackProfile.email,
-            });
-            
-            setProfile(fallbackProfile);
+          }
+        } 
+        else if (item.action === "UPDATE_PRODUCT") {
+          const { id, updatedFields } = item.payload;
+          
+          if (!id.startsWith("temp-")) {
+            const dbFields: any = {};
+            if (updatedFields.name !== undefined) dbFields.name = updatedFields.name;
+            if (updatedFields.stock !== undefined) dbFields.stock = updatedFields.stock;
+            if (updatedFields.threshold !== undefined) dbFields.threshold = updatedFields.threshold;
+            if (updatedFields.unit !== undefined) dbFields.unit = updatedFields.unit;
+            if (updatedFields.category !== undefined) dbFields.category = updatedFields.category;
+            if (updatedFields.purchasePrice !== undefined) dbFields.purchase_price = updatedFields.purchasePrice;
+            if (updatedFields.sellPrice !== undefined) dbFields.sell_price = updatedFields.sellPrice;
+
+            const { error } = await supabase.from("products").update(dbFields).eq("id", id);
+            if (error) {
+              if (isNetworkError(error)) throw error;
+              console.error("[Sync Engine] DB error updating product, skipping:", error.message);
+            }
+          }
+        } 
+        else if (item.action === "DELETE_PRODUCT") {
+          const { id } = item.payload;
+          
+          if (!id.startsWith("temp-")) {
+            const { error } = await supabase.from("products").delete().eq("id", id);
+            if (error) {
+              if (isNetworkError(error)) throw error;
+              console.error("[Sync Engine] DB error deleting product, skipping:", error.message);
+            }
+          }
+        } 
+        else if (item.action === "ADD_MOVEMENT") {
+          const { tempId, productId, type, quantity, note, time } = item.payload;
+          
+          if (!productId.startsWith("temp-")) {
+            // 1. Fetch current product stock from server to apply relative change
+            const { data: serverProd, error: fetchErr } = await supabase
+              .from("products")
+              .select("stock")
+              .eq("id", productId)
+              .single();
+
+            if (fetchErr) {
+              if (isNetworkError(fetchErr)) throw fetchErr;
+              console.error("[Sync Engine] DB error fetching product stock for movement:", fetchErr.message);
+            } else if (serverProd) {
+              const change = type === "Entrée" ? quantity : -quantity;
+              const newStock = Math.max(0, serverProd.stock + change);
+
+              // 2. Update stock on server
+              const { error: updateErr } = await supabase
+                .from("products")
+                .update({ stock: newStock })
+                .eq("id", productId);
+
+              if (updateErr) {
+                if (isNetworkError(updateErr)) throw updateErr;
+                console.error("[Sync Engine] DB error updating product stock for movement:", updateErr.message);
+              }
+            }
+
+            // 3. Insert movement record
+            const { data, error } = await supabase
+              .from("movements")
+              .insert({
+                product_id: productId,
+                type,
+                quantity,
+                time,
+                note: note || null,
+              })
+              .select()
+              .single();
+
+            if (error) {
+              if (isNetworkError(error)) throw error;
+              console.error("[Sync Engine] DB error inserting movement, skipping:", error.message);
+            } else if (data) {
+              const realMovId = data.id;
+              const currentMovsStr = localStorage.getItem("stocko_movements");
+              if (currentMovsStr) {
+                const movs: Movement[] = JSON.parse(currentMovsStr);
+                const updated = movs.map((m) => (m.id === tempId ? { ...m, id: realMovId } : m));
+                saveMovements(updated);
+              }
+            }
+          }
+        } 
+        else if (item.action === "UPDATE_PROFILE") {
+          const { name, sector, city, userName, email } = item.payload;
+          const dbFields: any = {};
+          if (name !== undefined) dbFields.name = name;
+          if (sector !== undefined) dbFields.sector = sector;
+          if (city !== undefined) dbFields.city = city;
+          if (userName !== undefined) dbFields.user_name = userName;
+          if (email !== undefined) dbFields.email = email;
+
+          const { error } = await supabase.from("profiles").update(dbFields).eq("id", userId);
+          if (error) {
+            if (isNetworkError(error)) throw error;
+            console.error("[Sync Engine] DB error updating profile, skipping:", error.message);
+          }
+        } 
+        else if (item.action === "IMPORT_PRODUCTS") {
+          const { newProducts, clearExisting } = item.payload;
+
+          if (clearExisting) {
+            const { error: delError } = await supabase
+              .from("products")
+              .delete()
+              .eq("profile_id", userId);
+
+            if (delError) {
+              if (isNetworkError(delError)) throw delError;
+              console.error("[Sync Engine] DB error clearing products on import:", delError.message);
+            }
+          }
+
+          if (newProducts.length > 0) {
+            const dbRows = newProducts.map((p: any) => ({
+              profile_id: userId,
+              name: p.name,
+              stock: p.stock,
+              threshold: p.threshold,
+              unit: p.unit,
+              category: p.category,
+              purchase_price: p.purchasePrice,
+              sell_price: p.sellPrice,
+            }));
+
+            const { error } = await supabase.from("products").insert(dbRows);
+            if (error) {
+              if (isNetworkError(error)) throw error;
+              console.error("[Sync Engine] DB error bulk importing products, skipping:", error.message);
+            }
           }
         }
 
-        // 2. Fetch products
-        const { data: prodsData } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (active && prodsData) {
-          const mappedProds = prodsData.map((p) => ({
-            id: p.id,
-            name: p.name,
-            stock: p.stock,
-            threshold: p.threshold,
-            unit: p.unit || "pièces",
-            category: p.category || "Divers",
-            purchasePrice: Number(p.purchase_price),
-            sellPrice: Number(p.sell_price),
-            status: calculateStatus(p.stock, p.threshold),
-          }));
-          setProducts(mappedProds);
-        }
-
-        // 3. Fetch movements
-        const { data: movsData } = await supabase
-          .from("movements")
-          .select(`
-            id,
-            type,
-            product_id,
-            quantity,
-            time,
-            note,
-            products ( name )
-          `)
-          .order("time", { ascending: false });
-
-        if (active && movsData) {
-          const mappedMovs = movsData.map((m) => ({
-            id: m.id,
-            type: m.type as "Entrée" | "Sortie",
-            productId: m.product_id,
-            productName: (m.products as any)?.name || "Produit inconnu",
-            quantity: m.quantity,
-            time: m.time,
-            note: m.note || undefined,
-          }));
-          setMovements(mappedMovs);
-        }
-      } catch (e) {
-        console.error("Failed to load data from Supabase:", e);
-      } finally {
-        if (active) {
-          setIsLoaded(true);
-        }
+        // Remove item from local queue on success
+        queue.shift();
+        saveQueue([...queue]);
+      } catch (err: any) {
+        console.error("[Sync Engine] Network error during processing, pausing queue:", err);
+        return false;
       }
     }
 
-    // Initialize session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (active) {
+    console.log("[Sync Engine] Queue successfully cleared!");
+    return true;
+  };
+
+  // Triggers the synchronization flow
+  const triggerSync = async (userId: string, userEmail?: string) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    setSyncStatus("syncing");
+
+    try {
+      const success = await processSyncQueue(userId);
+      if (success) {
+        await loadFreshDataFromServer(userId, userEmail);
+        setSyncStatus("synced");
+      } else {
+        setSyncStatus("offline-pending");
+      }
+    } catch (e) {
+      console.error("[Sync Engine] Synchronization run failed:", e);
+      setSyncStatus("offline-pending");
+    } finally {
+      isSyncingRef.current = false;
+    }
+  };
+
+  // Exposes manualSync button to UI
+  const manualSync = async () => {
+    const activeUser = await getActiveUser();
+    if (!activeUser) return;
+    await triggerSync(activeUser.id, activeUser.email || undefined);
+  };
+
+  // Core Session & Hydration logic
+  useEffect(() => {
+    let active = true;
+
+    async function initSessionAndData() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!active) return;
+
         if (session?.user) {
           setUser(session.user);
-          loadData(session.user.id, session.user.email);
+
+          // Fast UI Hydration from local storage
+          const localProds = localStorage.getItem("stocko_products");
+          const localMovs = localStorage.getItem("stocko_movements");
+          const localProfile = localStorage.getItem("stocko_profile");
+          const localQueue = localStorage.getItem("stocko_sync_queue");
+
+          if (localProds) setProducts(JSON.parse(localProds));
+          if (localMovs) setMovements(JSON.parse(localMovs));
+          if (localProfile) setProfile(JSON.parse(localProfile));
+          
+          const parsedQueue: SyncQueueItem[] = localQueue ? JSON.parse(localQueue) : [];
+          setSyncQueue(parsedQueue);
+          setIsLoaded(true);
+
+          if (typeof window !== "undefined" && navigator.onLine) {
+            triggerSync(session.user.id, session.user.email || undefined);
+          } else {
+            setSyncStatus(parsedQueue.length > 0 ? "offline-pending" : "offline");
+          }
         } else {
           setUser(null);
           setProducts([]);
           setMovements([]);
           setProfile(initialProfile);
+          setSyncQueue([]);
           setIsLoaded(true);
+          setSyncStatus("offline");
+          
+          // Clear caches on logout
+          localStorage.removeItem("stocko_products");
+          localStorage.removeItem("stocko_movements");
+          localStorage.removeItem("stocko_profile");
+          localStorage.removeItem("stocko_sync_queue");
         }
+      } catch (e) {
+        console.error("Initialization error:", e);
+        setIsLoaded(true);
       }
-    });
+    }
 
-    // Listen for auth changes
+    initSessionAndData();
+
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (active) {
         if (session?.user) {
           setUser(session.user);
-          loadData(session.user.id, session.user.email);
+          
+          const localProds = localStorage.getItem("stocko_products");
+          const localMovs = localStorage.getItem("stocko_movements");
+          const localProfile = localStorage.getItem("stocko_profile");
+          const localQueue = localStorage.getItem("stocko_sync_queue");
+
+          if (localProds) setProducts(JSON.parse(localProds));
+          if (localMovs) setMovements(JSON.parse(localMovs));
+          if (localProfile) setProfile(JSON.parse(localProfile));
+          
+          const parsedQueue: SyncQueueItem[] = localQueue ? JSON.parse(localQueue) : [];
+          setSyncQueue(parsedQueue);
+          setIsLoaded(true);
+
+          if (typeof window !== "undefined" && navigator.onLine) {
+            triggerSync(session.user.id, session.user.email || undefined);
+          } else {
+            setSyncStatus(parsedQueue.length > 0 ? "offline-pending" : "offline");
+          }
         } else {
           setUser(null);
           setProducts([]);
           setMovements([]);
           setProfile(initialProfile);
+          setSyncQueue([]);
           setIsLoaded(true);
+          setSyncStatus("offline");
+          
+          localStorage.removeItem("stocko_products");
+          localStorage.removeItem("stocko_movements");
+          localStorage.removeItem("stocko_profile");
+          localStorage.removeItem("stocko_sync_queue");
         }
       }
     });
@@ -220,102 +589,165 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Listen for online/offline events
+  useEffect(() => {
+    if (typeof window === "undefined" || !user) return;
+
+    const handleOnline = () => {
+      console.log("[Connectivity] Device went online. Syncing queue...");
+      triggerSync(user.id, user.email || undefined);
+    };
+
+    const handleOffline = () => {
+      console.log("[Connectivity] Device went offline.");
+      const queueStr = localStorage.getItem("stocko_sync_queue");
+      const q = queueStr ? JSON.parse(queueStr) : [];
+      setSyncStatus(q.length > 0 ? "offline-pending" : "offline");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [user]);
+
+  // Periodic queue retry check (every 15 seconds)
+  useEffect(() => {
+    if (typeof window === "undefined" || !user) return;
+
+    const interval = setInterval(() => {
+      const queueStr = localStorage.getItem("stocko_sync_queue");
+      const q = queueStr ? JSON.parse(queueStr) : [];
+      if (q.length > 0 && navigator.onLine && !isSyncingRef.current) {
+        console.log("[Periodic Sync] Pending items found. Resuming sync...");
+        triggerSync(user.id, user.email || undefined);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // State mutation wrappers
   const addProduct = async (prod: Omit<Product, "id" | "status">) => {
     const activeUser = await getActiveUser();
-    if (!activeUser) return;
 
-    const { data, error } = await supabase
-      .from("products")
-      .insert({
-        profile_id: activeUser.id,
+    const tempId = generateTempId("prod");
+    const newProduct: Product = {
+      id: tempId,
+      name: prod.name,
+      stock: prod.stock,
+      threshold: prod.threshold,
+      unit: prod.unit || "pièces",
+      category: prod.category || "Divers",
+      purchasePrice: Number(prod.purchasePrice),
+      sellPrice: Number(prod.sellPrice),
+      status: calculateStatus(prod.stock, prod.threshold),
+    };
+
+    const currentProds = [newProduct, ...products];
+    saveProducts(currentProds);
+
+    const queueItem: SyncQueueItem = {
+      id: generateTempId("sync"),
+      action: "ADD_PRODUCT",
+      payload: {
+        tempId,
         name: prod.name,
         stock: prod.stock,
         threshold: prod.threshold,
         unit: prod.unit,
         category: prod.category,
-        purchase_price: prod.purchasePrice,
-        sell_price: prod.sellPrice,
-      })
-      .select()
-      .single();
+        purchasePrice: Number(prod.purchasePrice),
+        sellPrice: Number(prod.sellPrice),
+      },
+      timestamp: Date.now(),
+    };
 
-    if (error) {
-      console.error("Error adding product:", error.message);
-      throw error;
-    }
+    const newQueue = [...syncQueue, queueItem];
+    saveQueue(newQueue);
 
-    if (data) {
-      const newProduct: Product = {
-        id: data.id,
-        name: data.name,
-        stock: data.stock,
-        threshold: data.threshold,
-        unit: data.unit || "pièces",
-        category: data.category || "Divers",
-        purchasePrice: Number(data.purchase_price),
-        sellPrice: Number(data.sell_price),
-        status: calculateStatus(data.stock, data.threshold),
-      };
-      setProducts((prev) => [newProduct, ...prev]);
+    if (activeUser && navigator.onLine) {
+      triggerSync(activeUser.id, activeUser.email || undefined);
+    } else {
+      setSyncStatus("offline-pending");
     }
   };
 
   const updateProduct = async (id: string, updatedFields: Partial<Omit<Product, "id">>) => {
     const activeUser = await getActiveUser();
-    if (!activeUser) return;
 
-    const dbFields: any = {};
-    if (updatedFields.name !== undefined) dbFields.name = updatedFields.name;
-    if (updatedFields.stock !== undefined) dbFields.stock = updatedFields.stock;
-    if (updatedFields.threshold !== undefined) dbFields.threshold = updatedFields.threshold;
-    if (updatedFields.unit !== undefined) dbFields.unit = updatedFields.unit;
-    if (updatedFields.category !== undefined) dbFields.category = updatedFields.category;
-    if (updatedFields.purchasePrice !== undefined) dbFields.purchase_price = updatedFields.purchasePrice;
-    if (updatedFields.sellPrice !== undefined) dbFields.sell_price = updatedFields.sellPrice;
+    const updatedProds = products.map((p) => {
+      if (p.id === id) {
+        const merged = { ...p, ...updatedFields };
+        merged.status = calculateStatus(merged.stock, merged.threshold);
+        return merged;
+      }
+      return p;
+    });
+    saveProducts(updatedProds);
 
-    const { error } = await supabase
-      .from("products")
-      .update(dbFields)
-      .eq("id", id);
+    const queueItem: SyncQueueItem = {
+      id: generateTempId("sync"),
+      action: "UPDATE_PRODUCT",
+      payload: {
+        id,
+        updatedFields,
+      },
+      timestamp: Date.now(),
+    };
 
-    if (error) {
-      console.error("Error updating product:", error.message);
-      throw error;
+    const newQueue = [...syncQueue, queueItem];
+    saveQueue(newQueue);
+
+    if (activeUser && navigator.onLine) {
+      triggerSync(activeUser.id, activeUser.email || undefined);
+    } else {
+      setSyncStatus("offline-pending");
     }
-
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === id) {
-          const merged = { ...p, ...updatedFields };
-          merged.status = calculateStatus(merged.stock, merged.threshold);
-          return merged;
-        }
-        return p;
-      })
-    );
   };
 
   const deleteProduct = async (id: string) => {
     const activeUser = await getActiveUser();
-    if (!activeUser) return;
 
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", id);
+    const filteredProds = products.filter((p) => p.id !== id);
+    const filteredMovs = movements.filter((m) => m.productId !== id);
+    saveProducts(filteredProds);
+    saveMovements(filteredMovs);
 
-    if (error) {
-      console.error("Error deleting product:", error.message);
-      throw error;
+    if (id.startsWith("temp-")) {
+      // Remove temp product additions/updates from queue
+      const newQueue = syncQueue.filter((q) => {
+        if (q.action === "ADD_PRODUCT" && q.payload.tempId === id) return false;
+        if (q.action === "UPDATE_PRODUCT" && q.payload.id === id) return false;
+        if (q.action === "ADD_MOVEMENT" && q.payload.productId === id) return false;
+        return true;
+      });
+      saveQueue(newQueue);
+      setSyncStatus(newQueue.length > 0 ? "offline-pending" : "offline");
+    } else {
+      const queueItem: SyncQueueItem = {
+        id: generateTempId("sync"),
+        action: "DELETE_PRODUCT",
+        payload: { id },
+        timestamp: Date.now(),
+      };
+
+      const newQueue = [...syncQueue, queueItem];
+      saveQueue(newQueue);
+
+      if (activeUser && navigator.onLine) {
+        triggerSync(activeUser.id, activeUser.email || undefined);
+      } else {
+        setSyncStatus("offline-pending");
+      }
     }
-
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    setMovements((prev) => prev.filter((m) => m.productId !== id));
   };
 
   const addMovement = async (productId: string, type: "Entrée" | "Sortie", quantity: number, note?: string, date?: string) => {
     const activeUser = await getActiveUser();
-    if (!activeUser) return;
 
     const product = products.find((p) => p.id === productId);
     if (!product) return;
@@ -323,154 +755,119 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
     const change = type === "Entrée" ? quantity : -quantity;
     const newStock = Math.max(0, product.stock + change);
 
-    // 1. Update product stock in DB
-    const { error: prodError } = await supabase
-      .from("products")
-      .update({ stock: newStock })
-      .eq("id", productId);
+    // Update product stock locally
+    const updatedProds = products.map((p) => {
+      if (p.id === productId) {
+        return {
+          ...p,
+          stock: newStock,
+          status: calculateStatus(newStock, p.threshold),
+        };
+      }
+      return p;
+    });
+    saveProducts(updatedProds);
 
-    if (prodError) {
-      console.error("Error updating product stock for movement:", prodError.message);
-      throw prodError;
-    }
+    // Prepend movement locally
+    const tempId = generateTempId("mov");
+    const newMovement: Movement = {
+      id: tempId,
+      type,
+      productId,
+      productName: product.name,
+      quantity,
+      time: date ? new Date(date).toISOString() : new Date().toISOString(),
+      note: note || undefined,
+    };
+    const updatedMovs = [newMovement, ...movements];
+    saveMovements(updatedMovs);
 
-    // 2. Insert movement record in DB
-    const { data: movData, error: movError } = await supabase
-      .from("movements")
-      .insert({
-        product_id: productId,
-        type,
-        quantity,
-        time: date ? new Date(date).toISOString() : new Date().toISOString(),
-        note: note || null,
-      })
-      .select()
-      .single();
-
-    if (movError) {
-      console.error("Error adding movement record:", movError.message);
-      throw movError;
-    }
-
-    if (movData) {
-      // Update local product state
-      setProducts((prev) =>
-        prev.map((p) => {
-          if (p.id === productId) {
-            return {
-              ...p,
-              stock: newStock,
-              status: calculateStatus(newStock, p.threshold),
-            };
-          }
-          return p;
-        })
-      );
-
-      // Add local movement state
-      const newMovement: Movement = {
-        id: movData.id,
-        type,
+    const queueItem: SyncQueueItem = {
+      id: generateTempId("sync"),
+      action: "ADD_MOVEMENT",
+      payload: {
+        tempId,
         productId,
-        productName: product.name,
+        type,
         quantity,
-        time: movData.time,
-        note: movData.note || undefined,
-      };
-      setMovements((prev) => [newMovement, ...prev]);
+        note,
+        time: newMovement.time,
+      },
+      timestamp: Date.now(),
+    };
+
+    const newQueue = [...syncQueue, queueItem];
+    saveQueue(newQueue);
+
+    if (activeUser && navigator.onLine) {
+      triggerSync(activeUser.id, activeUser.email || undefined);
+    } else {
+      setSyncStatus("offline-pending");
     }
   };
 
   const updateProfile = async (newProfile: Partial<CompanyProfile>) => {
     const activeUser = await getActiveUser();
-    if (!activeUser) return;
 
-    const dbFields: any = {};
-    if (newProfile.name !== undefined) dbFields.name = newProfile.name;
-    if (newProfile.sector !== undefined) dbFields.sector = newProfile.sector;
-    if (newProfile.city !== undefined) dbFields.city = newProfile.city;
-    if (newProfile.userName !== undefined) dbFields.user_name = newProfile.userName;
-    if (newProfile.email !== undefined) dbFields.email = newProfile.email;
+    const updatedProfile = { ...profile, ...newProfile };
+    saveProfile(updatedProfile);
 
-    const { error } = await supabase
-      .from("profiles")
-      .update(dbFields)
-      .eq("id", activeUser.id);
+    const queueItem: SyncQueueItem = {
+      id: generateTempId("sync"),
+      action: "UPDATE_PROFILE",
+      payload: newProfile,
+      timestamp: Date.now(),
+    };
 
-    if (error) {
-      console.error("Error updating profile:", error.message);
-      throw error;
+    const newQueue = [...syncQueue, queueItem];
+    saveQueue(newQueue);
+
+    if (activeUser && navigator.onLine) {
+      triggerSync(activeUser.id, activeUser.email || undefined);
+    } else {
+      setSyncStatus("offline-pending");
     }
-
-    setProfile((prev) => ({ ...prev, ...newProfile }));
   };
 
   const importProducts = async (newProds: Omit<Product, "id" | "status">[], clearExisting = false) => {
     const activeUser = await getActiveUser();
-    if (!activeUser) return;
 
-    if (clearExisting) {
-      const { error: delError } = await supabase
-        .from("products")
-        .delete()
-        .eq("profile_id", activeUser.id);
-
-      if (delError) {
-        console.error("Error clearing existing products:", delError.message);
-        throw delError;
-      }
-    }
-
-    if (newProds.length === 0) {
-      if (clearExisting) {
-        setProducts([]);
-        setMovements([]);
-      }
-      return;
-    }
-
-    const dbRows = newProds.map((p) => ({
-      profile_id: activeUser.id,
+    const mapped = newProds.map((p) => ({
+      id: generateTempId("prod"),
       name: p.name,
       stock: p.stock,
       threshold: p.threshold,
-      unit: p.unit,
-      category: p.category,
-      purchase_price: p.purchasePrice,
-      sell_price: p.sellPrice,
+      unit: p.unit || "pièces",
+      category: p.category || "Divers",
+      purchasePrice: Number(p.purchasePrice),
+      sellPrice: Number(p.sellPrice),
+      status: calculateStatus(p.stock, p.threshold),
     }));
 
-    const { data, error } = await supabase
-      .from("products")
-      .insert(dbRows)
-      .select();
-
-    if (error) {
-      console.error("Error bulk importing products:", error.message);
-      throw error;
+    if (clearExisting) {
+      saveProducts(mapped);
+      saveMovements([]);
+    } else {
+      saveProducts([...mapped, ...products]);
     }
 
-    if (data) {
-      const mapped = data.map((d) => ({
-        id: d.id,
-        name: d.name,
-        stock: d.stock,
-        threshold: d.threshold,
-        unit: d.unit || "pièces",
-        category: d.category || "Divers",
-        purchasePrice: Number(d.purchase_price),
-        sellPrice: Number(d.sell_price),
-        status: calculateStatus(d.stock, d.threshold),
-      }));
+    const queueItem: SyncQueueItem = {
+      id: generateTempId("sync"),
+      action: "IMPORT_PRODUCTS",
+      payload: {
+        newProducts: newProds,
+        clearExisting,
+      },
+      timestamp: Date.now(),
+    };
 
-      setProducts((prev) => {
-        if (clearExisting) return mapped;
-        return [...mapped, ...prev];
-      });
+    const newQueue = [...syncQueue, queueItem];
+    saveQueue(newQueue);
 
-      if (clearExisting) {
-        setMovements([]);
-      }
+    if (activeUser && navigator.onLine) {
+      triggerSync(activeUser.id, activeUser.email || undefined);
+    } else {
+      setSyncStatus("offline-pending");
     }
   };
 
@@ -482,12 +879,14 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
         categories: initialCategories,
         profile,
         user,
+        syncStatus,
         addProduct,
         updateProduct,
         deleteProduct,
         addMovement,
         updateProfile,
         importProducts,
+        triggerSync: manualSync,
       }}
     >
       {isLoaded ? (
