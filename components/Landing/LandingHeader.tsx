@@ -64,41 +64,41 @@ export default function LandingHeader() {
             onClick={() => setMobileMenuOpen(false)}
           />
           <div className="landing-mobile-menu-panel">
-            <div className="flex flex-col space-y-8">
-              {/* Header inside Menu */}
-              <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                <Link href="/" className="landing-logo" onClick={() => setMobileMenuOpen(false)}>
-                  <Boxes className="w-7 h-7 text-[#fd761a]" />
-                  <span className="text-xl">Stocko</span>
-                </Link>
-                <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 hover:bg-black/5 rounded-lg transition-colors cursor-pointer"
-                  aria-label="Close Mobile Menu"
-                >
-                  <X className="w-5 h-5 text-[#0b1c30]" />
-                </button>
-              </div>
+            {/* Header inside Menu */}
+            <div className="flex justify-between items-center pb-3 sm:pb-4 border-b border-gray-100 shrink-0">
+              <Link href="/" className="landing-logo" onClick={() => setMobileMenuOpen(false)}>
+                <Boxes className="w-7 h-7 text-[#fd761a]" />
+                <span className="text-xl">Stocko</span>
+              </Link>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 hover:bg-black/5 rounded-lg transition-colors cursor-pointer"
+                aria-label="Close Mobile Menu"
+              >
+                <X className="w-5 h-5 text-[#0b1c30]" />
+              </button>
+            </div>
 
-              {/* Navigation links */}
-              <nav className="flex flex-col space-y-4">
+            {/* Navigation links (Middle scrollable content) */}
+            <div className="flex-1 min-h-0 overflow-y-auto py-4 sm:py-6 flex flex-col">
+              <nav className="flex flex-col space-y-2 sm:space-y-3">
                 <a
                   href="#features"
-                  className="text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2"
+                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2 px-1 rounded-lg hover:bg-gray-50"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Fonctionnalités
                 </a>
                 <a
                   href="#pricing"
-                  className="text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2"
+                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2 px-1 rounded-lg hover:bg-gray-50"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Tarifs
                 </a>
                 <a
                   href="#faq"
-                  className="text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2"
+                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2 px-1 rounded-lg hover:bg-gray-50"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   FAQ
@@ -106,8 +106,8 @@ export default function LandingHeader() {
               </nav>
             </div>
 
-            {/* Actions inside Menu */}
-            <div className="border-t border-gray-100 pt-6 flex flex-col space-y-4">
+            {/* Actions inside Menu (Pinned to bottom) */}
+            <div className="border-t border-gray-100 pt-4 sm:pt-6 mt-auto flex flex-col space-y-3 shrink-0">
               {user ? (
                 <Link
                   href="/dashboard"
