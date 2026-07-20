@@ -65,7 +65,7 @@ export default function LandingHeader() {
           />
           <div className="landing-mobile-menu-panel">
             {/* Header inside Menu */}
-            <div className="flex justify-between items-center pb-3 sm:pb-4 border-b border-gray-100 shrink-0">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100 shrink-0">
               <Link href="/" className="landing-logo" onClick={() => setMobileMenuOpen(false)}>
                 <Boxes className="w-7 h-7 text-[#fd761a]" />
                 <span className="text-xl">Stocko</span>
@@ -79,62 +79,63 @@ export default function LandingHeader() {
               </button>
             </div>
 
-            {/* Navigation links (Middle scrollable content) */}
-            <div className="flex-1 min-h-0 overflow-y-auto py-4 sm:py-6 flex flex-col">
-              <nav className="flex flex-col space-y-2 sm:space-y-3">
+            {/* Navigation links & Actions content flow */}
+            <div className="flex-1 flex flex-col justify-start pt-6 space-y-6">
+              {/* Navigation links */}
+              <nav className="flex flex-col space-y-1 sm:space-y-2">
                 <a
                   href="#features"
-                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2 px-1 rounded-lg hover:bg-gray-50"
+                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2.5 px-3 rounded-xl hover:bg-gray-50 flex items-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Fonctionnalités
                 </a>
                 <a
                   href="#pricing"
-                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2 px-1 rounded-lg hover:bg-gray-50"
+                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2.5 px-3 rounded-xl hover:bg-gray-50 flex items-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Tarifs
                 </a>
                 <a
                   href="#faq"
-                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2 px-1 rounded-lg hover:bg-gray-50"
+                  className="text-base sm:text-lg font-semibold text-[#0b1c30] hover:text-[#fd761a] transition-colors py-2.5 px-3 rounded-xl hover:bg-gray-50 flex items-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   FAQ
                 </a>
               </nav>
-            </div>
 
-            {/* Actions inside Menu (Pinned to bottom) */}
-            <div className="border-t border-gray-100 pt-4 sm:pt-6 mt-auto flex flex-col space-y-3 shrink-0">
-              {user ? (
-                <Link
-                  href="/dashboard"
-                  className="landing-price-btn-pro w-full flex items-center justify-center gap-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <span>Accéder au Tableau de Bord</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              ) : (
-                <>
+              {/* Actions inside Menu */}
+              <div className="border-t border-gray-100 pt-6 flex flex-col space-y-3">
+                {user ? (
                   <Link
-                    href="/connexion"
-                    className="landing-price-btn-free w-full"
+                    href="/dashboard"
+                    className="landing-price-btn-pro w-full flex items-center justify-center gap-2"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Se connecter
+                    <span>Accéder au Tableau de Bord</span>
+                    <ArrowRight className="w-4 h-4" />
                   </Link>
-                  <Link
-                    href="/connexion?mode=onboarding"
-                    className="landing-price-btn-pro w-full"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Essayer gratuitement
-                  </Link>
-                </>
-              )}
+                ) : (
+                  <>
+                    <Link
+                      href="/connexion"
+                      className="landing-price-btn-free w-full"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Se connecter
+                    </Link>
+                    <Link
+                      href="/connexion?mode=onboarding"
+                      className="landing-price-btn-pro w-full"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Essayer gratuitement
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </>
