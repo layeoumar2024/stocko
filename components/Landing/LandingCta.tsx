@@ -17,9 +17,9 @@ export default function LandingCta() {
           <Link href="/connexion?mode=onboarding" className="landing-btn-cta-primary">
             Créer mon compte gratuitement
           </Link>
-          <a href="https://wa.me/22600000000" target="_blank" rel="noopener noreferrer" className="landing-btn-cta-secondary">
-            Contacter un conseiller
-          </a>
+          <Link href="/connexion" className="landing-btn-cta-secondary">
+            Se connecter
+          </Link>
         </div>
       </div>
     </section>

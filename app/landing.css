@@ -39,41 +39,41 @@
 
 /* Header */
 .landing-header {
-  @apply sticky top-0 w-full z-50 bg-[#f8f9ff]/80 backdrop-blur-md border-b border-[#bfc9c3]/30 shadow-xs transition-all duration-300;
+  @apply sticky top-0 w-full z-50 bg-[#f8f9ff]/95 border-b border-[#bfc9c3]/30 shadow-xs transition-all duration-200;
 }
 .landing-header-container {
-  @apply flex justify-between items-center px-4 md:px-6 max-w-7xl mx-auto h-20;
+  @apply flex justify-between items-center px-3 sm:px-6 max-w-7xl mx-auto h-16 sm:h-20;
 }
 .landing-logo {
-  @apply flex items-center gap-2 text-[#064e3b] font-black text-2xl md:text-3xl tracking-tight select-none cursor-pointer;
+  @apply flex items-center gap-1.5 sm:gap-2 text-[#064e3b] font-black text-xl sm:text-2xl md:text-3xl tracking-tight select-none cursor-pointer active:scale-95 transition-transform;
 }
 .landing-nav {
   @apply hidden md:flex items-center gap-8;
 }
 .landing-nav-link {
-  @apply font-semibold text-[#404944] hover:text-[#9d4300] transition-colors duration-200 text-sm;
+  @apply font-semibold text-[#404944] hover:text-[#9d4300] transition-colors duration-150 text-sm active:scale-95;
 }
 .landing-header-actions {
-  @apply flex items-center gap-4;
+  @apply flex items-center gap-2 sm:gap-3;
 }
 .landing-btn-connexion {
-  @apply hidden md:block font-bold text-[#003527] hover:text-[#9d4300] px-4 py-2 transition-colors duration-200 text-sm;
+  @apply inline-flex items-center justify-center font-extrabold text-[#003527] hover:text-[#9d4300] bg-[#003527]/5 hover:bg-[#003527]/10 md:bg-transparent md:hover:bg-transparent px-3 py-1.5 sm:px-4 sm:py-2 transition-all duration-150 text-xs sm:text-sm rounded-xl border border-[#003527]/15 md:border-transparent cursor-pointer active:scale-95 min-h-[38px] sm:min-h-[40px];
 }
 .landing-btn-free {
-  @apply bg-[#fd761a] hover:bg-[#9d4300] text-white font-extrabold px-5 py-2.5 rounded-lg shadow-sm transition-all duration-200 active:scale-95 cursor-pointer text-sm;
+  @apply bg-[#fd761a] hover:bg-[#9d4300] text-white font-extrabold px-3.5 py-1.5 sm:px-5 sm:py-2.5 rounded-xl shadow-xs transition-all duration-150 active:scale-95 cursor-pointer text-xs sm:text-sm min-h-[38px] sm:min-h-[44px] flex items-center justify-center;
 }
 .landing-menu-toggle {
-  @apply md:hidden p-2 text-[#0b1c30] hover:bg-black/5 rounded-lg transition-colors cursor-pointer;
+  @apply md:hidden p-2 text-[#0b1c30] hover:bg-black/5 rounded-xl transition-all cursor-pointer active:scale-95 min-w-[40px] min-h-[40px] flex items-center justify-center;
 }
 
 /* Mobile Menu Backdrop & Panel */
 .landing-mobile-menu-overlay {
-  @apply fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden;
-  animation: fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  @apply fixed inset-0 bg-black/70 z-40 md:hidden;
+  animation: fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .landing-mobile-menu-panel {
-  @apply fixed top-0 right-0 h-full max-h-dvh w-80 max-w-[85vw] bg-white shadow-2xl z-50 p-5 sm:p-6 flex flex-col overflow-y-auto md:hidden;
-  animation: slide-in-right 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  @apply fixed top-0 right-0 h-auto max-h-[90vh] w-80 max-w-[88vw] bg-white shadow-2xl z-50 p-5 sm:p-6 flex flex-col overflow-y-auto md:hidden rounded-bl-2xl border-l border-b border-gray-100;
+  animation: slide-in-right 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Hero Section */
@@ -256,10 +256,10 @@
   @apply flex items-center gap-3 text-gray-300 font-medium;
 }
 .landing-price-btn-free {
-  @apply inline-flex items-center justify-center w-full border-2 border-[#064e3b] text-[#064e3b] hover:bg-[#064e3b]/5 font-bold py-4 rounded-xl transition-all active:scale-[0.98] cursor-pointer text-center text-sm;
+  @apply inline-flex items-center justify-center w-full border-2 border-[#064e3b] text-[#064e3b] hover:bg-[#064e3b]/5 font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] cursor-pointer text-center text-sm min-h-[48px];
 }
 .landing-price-btn-pro {
-  @apply inline-flex items-center justify-center w-full bg-[#fd761a] hover:bg-[#9d4300] text-white font-bold py-4 rounded-xl shadow-md transition-all active:scale-[0.98] cursor-pointer text-center text-sm;
+  @apply inline-flex items-center justify-center w-full bg-[#fd761a] hover:bg-[#9d4300] text-white font-bold py-3.5 rounded-xl shadow-md transition-all active:scale-[0.98] cursor-pointer text-center text-sm min-h-[48px];
 }
 
 /* Testimonial Section */

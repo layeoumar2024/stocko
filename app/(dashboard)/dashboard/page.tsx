@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const subscribeOnlineStatus = (callback: () => void) => {
   window.addEventListener("online", callback);
@@ -30,7 +31,8 @@ import {
   X,
   Package,
   Layers,
-  ArrowLeftRight
+  ArrowLeftRight,
+  CheckCircle
 } from "lucide-react";
 import { useStock, InsufficientStockError } from "@/context/StockContext";
 
@@ -77,6 +79,7 @@ const formatDateFrench = (date: Date) => {
 };
 
 export default function Home() {
+  const router = useRouter();
   const { products, movements, addProduct, addMovement, profile, syncStatus } = useStock();
   const [mounted, setMounted] = useState(false);
   const [validationError, setValidationError] = useState<{
@@ -154,7 +157,22 @@ export default function Home() {
   // Derived stats
   const totalProducts = products.length;
   const stockValue = products.reduce((acc, p) => acc + p.stock * p.purchasePrice, 0);
+  const totalStockUnits = products.reduce((acc, p) => acc + p.stock, 0);
   const alertsCount = products.filter((p) => p.stock <= p.threshold).length;
+
+  const formatMergedSubtitle = () => {
+    const today = new Date();
+    const formattedDate = formatWeekdayFrench(today);
+    const dateStr = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+    
+    if (alertsCount === 0) {
+      return `${dateStr} — Tous vos stocks sont stables.`;
+    } else if (alertsCount === 1) {
+      return `${dateStr} — 1 produit demande votre attention.`;
+    } else {
+      return `${dateStr} — ${alertsCount} produits demandent votre attention.`;
+    }
+  };
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -247,83 +265,125 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 lg:p-12 max-w-7xl mx-auto flex flex-col space-y-10">
+    <div className="min-h-screen p-4 sm:p-8 lg:p-12 pb-24 sm:pb-32 lg:pb-12 max-w-7xl mx-auto flex flex-col space-y-8 sm:space-y-10">
       {/* Top Welcome Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <div className="text-xs font-bold tracking-widest text-[#8A7F6E] uppercase mb-1">
             Vue d'ensemble
           </div>
-          <h1 className="text-3xl font-extrabold text-brand-blue flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-blue flex items-center gap-2">
             Bonjour, {profile.userName} <span className="animate-wiggle inline-block">👋</span>
-            {mounted && (
-              <span className="inline-flex items-center gap-2 ml-1">
-                {renderConnectionStatus()}
-                {renderSyncStatusBadge()}
-              </span>
-            )}
           </h1>
-          <p className="text-sm text-[#8A7F6E] mt-1 font-medium">
-            Voici l'état de votre stock aujourd'hui{mounted ? `, ${formatWeekdayFrench(new Date())}` : ""}.
+          <p className="text-sm text-[#8A7F6E] mt-1.5 font-medium">
+            {mounted ? formatMergedSubtitle() : "Chargement..."}
           </p>
         </div>
 
-        {/* Date Selector Badge */}
-        <div className="flex items-center gap-2 bg-[#F0EAE0]/50 border border-[#E5E0D5] px-4 py-2 rounded-xl text-sm font-semibold text-brand-blue/80 self-start md:self-auto">
-          <Calendar className="w-4 h-4 text-[#8A7F6E]" />
-          <span>{mounted ? formatDateFrench(new Date()) : "..."}</span>
+        {/* Desktop Header Actions */}
+        <div className="hidden lg:flex items-center gap-4">
+          <button
+            onClick={() => setIsProductModalOpen(true)}
+            className="bg-white border-2 border-brand-blue text-brand-blue px-5 py-3 rounded-xl font-bold text-[14px] hover:bg-brand-blue/5 hover:shadow-sm transition-all duration-200 ease-out active:scale-[0.97] flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Ajouter un produit</span>
+          </button>
+          <button
+            onClick={() => setIsMovementModalOpen(true)}
+            className="bg-[#111E35] text-white px-5 py-3.5 rounded-xl font-bold text-[14px] hover:bg-[#1a2c4e] hover:shadow-md transition-all duration-200 ease-out active:scale-[0.97] flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <ArrowLeftRight className="w-4 h-4" />
+            <span>Nouveau mouvement</span>
+          </button>
         </div>
       </div>
 
-      {/* Grid of 4 Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Card 1: Produits en stock */}
-        <div className="animate-slide-up bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-brand-accent/20 transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer">
+      {/* Grid of 4 Stats Cards (Responsive 2x2 grid on mobile) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {/* Card 1: Références */}
+        <div 
+          onClick={() => router.push("/produits")}
+          className="animate-slide-up bg-white border border-[#E5E0D5]/65 rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-brand-accent/20 transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer group"
+        >
           <div>
-            <div className="text-sm font-bold text-[#8A7F6E]">Produits en stock</div>
-            <div className="text-3xl font-extrabold text-brand-blue mt-2">{totalProducts}</div>
+            <div className="text-xs sm:text-sm font-bold text-[#8A7F6E] flex items-center gap-1.5">
+              <Package className="w-4 h-4 text-[#8A7F6E]" />
+              <span>Références</span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-brand-blue mt-2 sm:mt-4">{totalProducts}</div>
           </div>
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-[#0A8543] mt-4">
-            <TrendingUp className="w-4 h-4" />
-            <span>+4 cette semaine</span>
+          <div className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-[#0A8543] mt-3 sm:mt-6">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>+1 cette semaine</span>
           </div>
         </div>
 
         {/* Card 2: Valeur du stock */}
-        <div className="animate-slide-up [animation-delay:50ms] bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-brand-accent/20 transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer">
+        <div 
+          onClick={() => router.push("/rapport")}
+          className="animate-slide-up [animation-delay:50ms] bg-white border border-[#E5E0D5]/65 rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-brand-accent/20 transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer group"
+        >
           <div>
-            <div className="text-sm font-bold text-[#8A7F6E]">Valeur du stock</div>
-            <div className="text-3xl font-extrabold text-brand-blue mt-2">
+            <div className="text-xs sm:text-sm font-bold text-[#8A7F6E] flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-[#8A7F6E]" />
+              <span>Valeur du stock</span>
+            </div>
+            <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-brand-blue mt-2 sm:mt-4 truncate">
               {stockValue.toLocaleString("fr-FR")} F
             </div>
           </div>
-          <div className="text-xs text-[#8A7F6E] mt-4 font-semibold">
-            Actif net valorisé
+          <div className="text-[11px] sm:text-xs text-[#8A7F6E] mt-3 sm:mt-6 font-semibold">
+            {totalStockUnits} unités en réserve
           </div>
         </div>
 
-        {/* Card 3: Alertes rupture */}
-        <div className="animate-slide-up [animation-delay:100ms] bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-brand-accent/20 transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer">
+        {/* Card 3: Rupture (Conditional Red Tinting) */}
+        <div 
+          onClick={() => router.push("/alertes")}
+          className={`animate-slide-up [animation-delay:100ms] rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer group ${
+            alertsCount > 0 
+              ? "bg-[#FFF0F0] border border-[#D9381E]/30" 
+              : "bg-white border border-[#E5E0D5]/65 hover:border-brand-accent/20"
+          }`}
+        >
           <div>
-            <div className="text-sm font-bold text-[#8A7F6E]">Alertes rupture</div>
-            <div className="text-3xl font-extrabold text-[#D9381E] mt-2">{alertsCount}</div>
+            <div className={`text-xs sm:text-sm font-bold flex items-center gap-1.5 ${alertsCount > 0 ? "text-[#D9381E]" : "text-[#8A7F6E]"}`}>
+              <AlertCircle className="w-4 h-4" />
+              <span>Rupture</span>
+            </div>
+            <div className={`text-2xl sm:text-3xl font-extrabold mt-2 sm:mt-4 ${alertsCount > 0 ? "text-[#D9381E]" : "text-brand-blue"}`}>
+              {alertsCount}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-[#D9381E] mt-4">
-            <AlertCircle className="w-4 h-4 animate-pulse" />
-            <span>à traiter</span>
-          </div>
+          {alertsCount > 0 ? (
+            <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-[#D9381E] mt-3 sm:mt-6">
+              <span>→ Voir le produit</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-[#0A8543] mt-3 sm:mt-6">
+              <CheckCircle className="w-3.5 h-3.5 text-[#0A8543]" />
+              <span>Stable</span>
+            </div>
+          )}
         </div>
 
-        {/* Card 4: Mouvements aujourd'hui */}
-        <div className="animate-slide-up [animation-delay:150ms] bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-brand-accent/20 transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer">
+        {/* Card 4: Mouvements du jour */}
+        <div 
+          onClick={() => router.push("/mouvements")}
+          className="animate-slide-up [animation-delay:150ms] bg-white border border-[#E5E0D5]/65 rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-brand-accent/20 transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer group"
+        >
           <div>
-            <div className="text-sm font-bold text-[#8A7F6E]">Mouvements aujourd'hui</div>
-            <div className="text-3xl font-extrabold text-brand-blue mt-2">{todayMovements}</div>
+            <div className="text-xs sm:text-sm font-bold text-[#8A7F6E] flex items-center gap-1.5">
+              <ArrowLeftRight className="w-4 h-4 text-[#8A7F6E]" />
+              <span>Mouvements du jour</span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-brand-blue mt-2 sm:mt-4">{todayMovements}</div>
           </div>
-          <div className="text-sm font-semibold text-[#8A7F6E] mt-4">
-            <span className="text-[#6E3FF3]">{todaySorties} sorties</span>
+          <div className="text-[11px] sm:text-xs font-semibold text-[#8A7F6E] mt-3 sm:mt-6 truncate">
+            <span className="text-[#D9381E]">{todaySorties} {todaySorties > 1 ? "sorties" : "sortie"}</span>
             {" · "}
-            <span className="text-[#0A8543]">{todayEntrees} entrées</span>
+            <span className="text-[#0A8543]">{todayEntrees} {todayEntrees > 1 ? "entrées" : "entrée"}</span>
           </div>
         </div>
       </div>
@@ -332,89 +392,138 @@ export default function Home() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
         {/* Column 1: Produits à surveiller */}
-        <div className="bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm flex flex-col h-full">
-          <div className="flex items-center justify-between pb-4 border-b border-[#FAF6EE] mb-2">
-            <h2 className="text-lg font-bold text-brand-blue">Produits à surveiller</h2>
-            <Link href="/alertes" className="text-xs font-bold text-[#8A7F6E] hover:text-brand-blue flex items-center gap-1 transition-colors">
-              Voir tout →
-            </Link>
-          </div>
+        <div className="bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm flex flex-col h-full justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-4 border-b border-[#FAF6EE] mb-2">
+              <h2 className="text-lg font-bold text-brand-blue">Produits à surveiller</h2>
+              <Link href="/alertes" className="text-xs font-bold text-[#8A7F6E] hover:text-brand-blue flex items-center gap-1 transition-colors">
+                Voir tout →
+              </Link>
+            </div>
 
-          <div className="flex-1 divide-y divide-[#FAF6EE]">
-            {products.map((prod) => (
-              <div key={prod.id} className="flex items-center justify-between py-3 px-3 -mx-3 rounded-xl hover:bg-[#FAF6EE]/50 hover:translate-x-1.5 transition-all duration-300 ease-out cursor-pointer">
-                <span className="font-semibold text-brand-blue text-[15px]">{prod.name}</span>
-                
-                {prod.status === "critical" && (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FFF0F0] text-[#D9381E] shadow-xs">
-                    {prod.stock} {prod.unit} restantes
-                  </span>
-                )}
-                {prod.status === "low" && (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FFF8E6] text-[#B25E00] shadow-xs">
-                    {prod.stock} {prod.unit} restantes
-                  </span>
-                )}
-                {prod.status === "stable" && (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#EDFBF3] text-[#0A8543] shadow-xs">
-                    {prod.stock} {prod.unit} — stable
-                  </span>
-                )}
+            <div className="divide-y divide-[#FAF6EE]">
+              {products.slice(0, 3).map((prod) => (
+                <div 
+                  key={prod.id} 
+                  onClick={() => router.push(`/produits/${prod.id}`)}
+                  className={`flex items-center justify-between py-3 px-3.5 my-1.5 rounded-xl hover:bg-[#FAF6EE]/50 hover:translate-x-1.5 transition-all duration-300 ease-out cursor-pointer ${
+                    prod.status === "critical"
+                      ? "border-l-4 border-l-[#D9381E]"
+                      : prod.status === "low"
+                      ? "border-l-4 border-l-[#B25E00]"
+                      : "border-l-4 border-l-[#0A8543]"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-brand-blue text-[15px]">{prod.name}</span>
+                    <span className="text-[11px] text-[#8A7F6E] font-medium mt-0.5">seuil {prod.threshold}</span>
+                  </div>
+                  
+                  {prod.status === "critical" && (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FFF0F0] text-[#D9381E] shadow-xs">
+                      {prod.stock} {prod.unit} restante{prod.stock > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {prod.status === "low" && (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FFF8E6] text-[#B25E00] shadow-xs">
+                      {prod.stock} {prod.unit} restante{prod.stock > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {prod.status === "stable" && (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#EDFBF3] text-[#0A8543] shadow-xs">
+                      {prod.stock} {prod.unit} — stable
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Onboarding bootstrap banner when products list is small (<= 2 references) */}
+            {products.length <= 2 && (
+              <div className="mt-4 p-4 rounded-xl border border-[#E5E0D5] bg-[#FFF8E6]/40 flex items-start gap-2.5 text-xs text-brand-blue/80 font-medium animate-fade-in">
+                <span className="text-base shrink-0">💡</span>
+                <div>
+                  Votre catalogue ne contient que {products.length} référence{products.length > 1 ? "s" : ""}.{" "}
+                  <button onClick={() => setIsProductModalOpen(true)} className="text-brand-accent hover:text-brand-accent-hover font-bold hover:underline transition-colors focus:outline-none">
+                    Ajoutez vos produits
+                  </button>{" "}
+                  pour que les alertes couvrent tout votre stock.
+                </div>
               </div>
-            ))}
-          </div>
-
-          {/* Action buttons at bottom */}
-          <div className="mt-8 pt-4 border-t border-[#FAF6EE] flex flex-wrap gap-4">
-            <button
-              onClick={() => setIsMovementModalOpen(true)}
-              className="group flex-1 min-w-[160px] bg-brand-blue text-white px-5 py-3.5 rounded-xl font-bold text-[14px] hover:bg-[#1a2c4e] hover:shadow-md transition-all duration-200 ease-out active:scale-[0.97] flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" />
-              Nouveau mouvement
-            </button>
-            <button
-              onClick={() => setIsProductModalOpen(true)}
-              className="group flex-1 min-w-[160px] bg-white border-2 border-brand-blue text-brand-blue px-5 py-3 rounded-xl font-bold text-[14px] hover:bg-brand-blue/5 hover:shadow-sm transition-all duration-200 ease-out active:scale-[0.97] flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" />
-              Ajouter un produit
-            </button>
+            )}
           </div>
         </div>
 
         {/* Column 2: Activité récente */}
-        <div className="bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm flex flex-col h-full">
-          <div className="pb-4 border-b border-[#FAF6EE] mb-2">
-            <h2 className="text-lg font-bold text-brand-blue">Activité récente</h2>
-          </div>
+        <div className="bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm flex flex-col h-full justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-4 border-b border-[#FAF6EE] mb-2">
+              <h2 className="text-lg font-bold text-brand-blue">Activité récente</h2>
+              <Link href="/mouvements" className="text-xs font-bold text-[#8A7F6E] hover:text-brand-blue flex items-center gap-1 transition-colors">
+                Historique →
+              </Link>
+            </div>
 
-          <div className="flex-1 divide-y divide-[#FAF6EE]">
-            {movements.map((mov) => (
-              <div key={mov.id} className="flex items-center justify-between py-3 px-3 -mx-3 rounded-xl hover:bg-[#FAF6EE]/50 hover:translate-x-1.5 transition-all duration-300 ease-out cursor-pointer">
-                <div className="flex items-center gap-3">
-                  {mov.type === "Sortie" ? (
-                    <span className="px-2.5 py-1 rounded-md text-[12px] font-bold bg-[#F6F0FF] text-[#6E3FF3] shadow-xs">
-                      Sortie
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-md text-[12px] font-bold bg-[#EDFBF3] text-[#0A8543] shadow-xs">
-                      Entrée
-                    </span>
-                  )}
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-brand-blue text-[15px]">{mov.productName}</span>
-                    <span className="text-[11px] text-[#8A7F6E] font-medium">{formatRelativeTime(mov.time)}</span>
+            <div className="divide-y divide-[#FAF6EE]">
+              {movements.slice(0, 4).map((mov) => (
+                <div 
+                  key={mov.id}
+                  onClick={() => router.push("/mouvements")}
+                  className="flex items-center justify-between py-3.5 px-3 -mx-3 rounded-xl hover:bg-[#FAF6EE]/50 hover:translate-x-1.5 transition-all duration-300 ease-out cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Circle badges with direction arrows */}
+                    {mov.type === "Sortie" ? (
+                      <div className="w-9 h-9 rounded-full bg-[#FFF0F0] text-[#D9381E] flex items-center justify-center shrink-0 shadow-xs">
+                        <ArrowDownRight className="w-4 h-4" />
+                      </div>
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-[#EDFBF3] text-[#0A8543] flex items-center justify-center shrink-0 shadow-xs">
+                        <ArrowUpRight className="w-4 h-4" />
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-brand-blue text-[15px]">{mov.productName}</span>
+                      <span className="text-[11px] text-[#8A7F6E] font-medium mt-0.5">
+                        {mov.type} · {formatRelativeTime(mov.time)}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <span className={`font-bold text-[16px] ${mov.type === "Sortie" ? "text-brand-blue" : "text-[#0A8543]"}`}>
-                  {mov.type === "Sortie" ? `-${mov.quantity}` : `+${mov.quantity}`}
-                </span>
-              </div>
-            ))}
+                  <span className={`font-extrabold text-[15px] ${mov.type === "Sortie" ? "text-[#D9381E]" : "text-[#0A8543]"}`}>
+                    {mov.type === "Sortie" ? `-${mov.quantity}` : `+${mov.quantity}`}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
+          
+          {movements.length > 0 && (
+            <div className="text-center pt-4 border-t border-[#FAF6EE] mt-4">
+              <Link href="/mouvements" className="text-xs font-bold text-brand-blue/70 hover:text-brand-blue transition-colors">
+                Voir les {movements.length} mouvements de la semaine
+              </Link>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Mobile Fixed Bottom Action Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-30 flex gap-3 shadow-lg">
+        <button
+          onClick={() => setIsProductModalOpen(true)}
+          className="flex-1 bg-white border-2 border-brand-blue text-brand-blue py-3.5 rounded-xl font-bold text-[14px] hover:bg-brand-blue/5 transition-all duration-150 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Produit</span>
+        </button>
+        <button
+          onClick={() => setIsMovementModalOpen(true)}
+          className="flex-1 bg-brand-blue text-white py-3.5 rounded-xl font-bold text-[14px] hover:bg-[#1a2c4e] transition-all duration-150 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <ArrowLeftRight className="w-4 h-4 text-brand-accent" />
+          <span>Mouvement</span>
+        </button>
       </div>
 
       {/* MODAL 1: Nouveau Mouvement */}

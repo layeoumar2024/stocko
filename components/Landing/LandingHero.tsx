@@ -48,11 +48,11 @@ export default function LandingHero() {
             ) : (
               <>
                 <Link href="/connexion?mode=onboarding" className="landing-btn-hero-primary group">
-                  <span>Commencer maintenant</span>
+                  <span>Créer un compte gratuitement</span>
                   <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <Link href="/connexion" className="landing-btn-hero-secondary">
-                  Voir la démo
+                  Se connecter
                 </Link>
               </>
             )}

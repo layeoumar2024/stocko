@@ -24,6 +24,7 @@ export interface Movement {
   quantity: number;
   time: string; // ISO string date
   note?: string;
+  user?: string;
 }
 
 export interface CompanyProfile {
@@ -68,6 +69,7 @@ interface StockContextType {
   profile: CompanyProfile;
   user: User | null;
   syncStatus: SyncStatus;
+  lastSynced: Date | null;
   addProduct: (product: Omit<Product, "id" | "status">) => Promise<void>;
   updateProduct: (id: string, updatedFields: Partial<Omit<Product, "id">>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
@@ -97,6 +99,7 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced");
   const [syncQueue, setSyncQueue] = useState<SyncQueueItem[]>([]);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
   
   const isSyncingRef = useRef(false);
 
@@ -146,6 +149,15 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
   const saveQueue = (newQueue: SyncQueueItem[]) => {
     setSyncQueue(newQueue);
     localStorage.setItem("stocko_sync_queue", JSON.stringify(newQueue));
+  };
+
+  const saveLastSynced = (date: Date | null) => {
+    setLastSynced(date);
+    if (date) {
+      localStorage.setItem("stocko_last_synced", date.toISOString());
+    } else {
+      localStorage.removeItem("stocko_last_synced");
+    }
   };
 
   // Helper to get active user
@@ -492,6 +504,7 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
       if (success) {
         await loadFreshDataFromServer(userId, userEmail);
         setSyncStatus("synced");
+        saveLastSynced(new Date());
       } else {
         setSyncStatus("offline-pending");
       }
@@ -514,6 +527,25 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true;
 
+    // Fast synchronous initial hydration from local cache
+    try {
+      const localProds = localStorage.getItem("stocko_products");
+      const localMovs = localStorage.getItem("stocko_movements");
+      const localProfile = localStorage.getItem("stocko_profile");
+      const localQueue = localStorage.getItem("stocko_sync_queue");
+      const localLastSynced = localStorage.getItem("stocko_last_synced");
+
+      if (localProds) setProducts(JSON.parse(localProds));
+      if (localMovs) setMovements(JSON.parse(localMovs));
+      if (localProfile) setProfile(JSON.parse(localProfile));
+      if (localQueue) setSyncQueue(JSON.parse(localQueue));
+      if (localLastSynced) setLastSynced(new Date(localLastSynced));
+      setIsLoaded(true);
+    } catch (e) {
+      console.error("Local hydration error:", e);
+      setIsLoaded(true);
+    }
+
     async function initSessionAndData() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -522,15 +554,16 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           setUser(session.user);
 
-          // Fast UI Hydration from local storage
           const localProds = localStorage.getItem("stocko_products");
           const localMovs = localStorage.getItem("stocko_movements");
           const localProfile = localStorage.getItem("stocko_profile");
           const localQueue = localStorage.getItem("stocko_sync_queue");
+          const localLastSynced = localStorage.getItem("stocko_last_synced");
 
           if (localProds) setProducts(JSON.parse(localProds));
           if (localMovs) setMovements(JSON.parse(localMovs));
           if (localProfile) setProfile(JSON.parse(localProfile));
+          if (localLastSynced) setLastSynced(new Date(localLastSynced));
           
           const parsedQueue: SyncQueueItem[] = localQueue ? JSON.parse(localQueue) : [];
           setSyncQueue(parsedQueue);
@@ -543,18 +576,8 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           setUser(null);
-          setProducts([]);
-          setMovements([]);
-          setProfile(initialProfile);
-          setSyncQueue([]);
           setIsLoaded(true);
           setSyncStatus("offline");
-          
-          // Clear caches on logout
-          localStorage.removeItem("stocko_products");
-          localStorage.removeItem("stocko_movements");
-          localStorage.removeItem("stocko_profile");
-          localStorage.removeItem("stocko_sync_queue");
         }
       } catch (e) {
         console.error("Initialization error:", e);
@@ -574,10 +597,12 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
           const localMovs = localStorage.getItem("stocko_movements");
           const localProfile = localStorage.getItem("stocko_profile");
           const localQueue = localStorage.getItem("stocko_sync_queue");
+          const localLastSynced = localStorage.getItem("stocko_last_synced");
 
           if (localProds) setProducts(JSON.parse(localProds));
           if (localMovs) setMovements(JSON.parse(localMovs));
           if (localProfile) setProfile(JSON.parse(localProfile));
+          if (localLastSynced) setLastSynced(new Date(localLastSynced));
           
           const parsedQueue: SyncQueueItem[] = localQueue ? JSON.parse(localQueue) : [];
           setSyncQueue(parsedQueue);
@@ -594,6 +619,7 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
           setMovements([]);
           setProfile(initialProfile);
           setSyncQueue([]);
+          setLastSynced(null);
           setIsLoaded(true);
           setSyncStatus("offline");
           
@@ -601,6 +627,7 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem("stocko_movements");
           localStorage.removeItem("stocko_profile");
           localStorage.removeItem("stocko_sync_queue");
+          localStorage.removeItem("stocko_last_synced");
         }
       }
     });
@@ -804,6 +831,7 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
       quantity,
       time: date ? new Date(date).toISOString() : new Date().toISOString(),
       note: note || undefined,
+      user: profile.userName || "Utilisateur",
     };
     const updatedMovs = [newMovement, ...movements];
     saveMovements(updatedMovs);
@@ -906,6 +934,7 @@ export function StockProvider({ children }: { children: React.ReactNode }) {
         profile,
         user,
         syncStatus,
+        lastSynced,
         addProduct,
         updateProduct,
         deleteProduct,

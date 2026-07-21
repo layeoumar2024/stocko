@@ -38,7 +38,8 @@ const getOnlineStatusServerSnapshot = () => {
 export default function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const { products, profile, user, syncStatus } = useStock();
+  const { products, profile, user, syncStatus, lastSynced } = useStock();
+  const [syncLabel, setSyncLabel] = useState("Synchronisé");
 
   const isOnline = useSyncExternalStore(
     subscribeOnlineStatus,
@@ -48,11 +49,81 @@ export default function Sidebar() {
 
   // Auto-close sidebar on mobile when navigating
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsOpen(false);
-    }, 0);
-    return () => clearTimeout(timer);
+    setIsOpen(false);
   }, [pathname]);
+
+  // Dynamic relative sync time label
+  useEffect(() => {
+    if (!lastSynced) {
+      setSyncLabel("Synchronisé");
+      return;
+    }
+
+    const updateLabel = () => {
+      const diffMs = Date.now() - new Date(lastSynced).getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+
+      if (diffMins < 1) {
+        setSyncLabel("Synchronisé à l'instant");
+      } else if (diffMins < 60) {
+        setSyncLabel(`Synchronisé il y a ${diffMins} min`);
+      } else if (diffHours < 24) {
+        setSyncLabel(`Synchronisé il y a ${diffHours}h`);
+      } else {
+        setSyncLabel("Synchronisé");
+      }
+    };
+
+    updateLabel();
+    const interval = setInterval(updateLabel, 30000); // 30s update
+    return () => clearInterval(interval);
+  }, [lastSynced]);
+
+  const getInitials = (name: string) => {
+    if (!name) return "S";
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const renderSingleSyncStatus = () => {
+    if (!isOnline) {
+      return (
+        <div className="flex items-center gap-1.5 text-red-400 text-[11px] font-semibold select-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E] animate-pulse" />
+          <span>Hors ligne</span>
+        </div>
+      );
+    }
+
+    if (syncStatus === "syncing") {
+      return (
+        <div className="flex items-center gap-1.5 text-[#E5A93C] text-[11px] font-semibold select-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#E5A93C] animate-pulse" />
+          <span>Synchronisation...</span>
+        </div>
+      );
+    }
+
+    if (syncStatus === "offline-pending") {
+      return (
+        <div className="flex items-center gap-1.5 text-red-400 text-[11px] font-semibold select-none animate-pulse">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
+          <span>En attente de réseau</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-medium select-none">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#0A8543]" />
+        <span>{syncLabel}</span>
+      </div>
+    );
+  };
 
   const alertCount = products.filter((p) => p.stock <= p.threshold).length;
 
@@ -85,58 +156,6 @@ export default function Sidebar() {
     },
   ];
 
-  const renderConnectionStatus = () => {
-    if (isOnline) {
-      return (
-        <div className="flex items-center gap-1.5 text-[#0A8543] bg-[#EDFBF3]/10 border border-[#0A8543]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#0A8543]" />
-          <span>En ligne</span>
-        </div>
-      );
-    } else {
-      return (
-        <div className="flex items-center gap-1.5 text-[#D9381E] bg-[#FFF0F0]/10 border border-[#D9381E]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap animate-pulse">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
-          <span>Hors ligne</span>
-        </div>
-      );
-    }
-  };
-
-  const renderSyncStatus = (compact: boolean) => {
-    switch (syncStatus) {
-      case "synced":
-        return (
-          <div className="flex items-center gap-1.5 text-[#0A8543] bg-[#EDFBF3]/10 border border-[#0A8543]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0A8543]" />
-            {!compact && <span>Synchronisé</span>}
-          </div>
-        );
-      case "syncing":
-        return (
-          <div className="flex items-center gap-1.5 text-[#B25E00] bg-[#FFF8E6]/10 border border-[#B25E00]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#B25E00] animate-pulse" />
-            {!compact && <span>Sync en cours...</span>}
-          </div>
-        );
-      case "offline-pending":
-        return (
-          <div className="flex items-center gap-1.5 text-[#D9381E] bg-[#FFF0F0]/10 border border-[#D9381E]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap animate-pulse">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
-            {!compact && <span>Hors ligne (Attente)</span>}
-          </div>
-        );
-      case "offline":
-      default:
-        return (
-          <div className="flex items-center gap-1.5 text-[#D9381E] bg-[#FFF0F0]/10 border border-[#D9381E]/20 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap animate-pulse">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#D9381E]" />
-            {!compact && <span>Hors ligne</span>}
-          </div>
-        );
-    }
-  };
-
   return (
     <>
       {/* Mobile Top Navbar */}
@@ -146,9 +165,8 @@ export default function Sidebar() {
             S
           </div>
           <span className="text-lg font-bold tracking-wide">Stocko</span>
-          <div className="flex items-center gap-1.5">
-            {renderConnectionStatus()}
-            {renderSyncStatus(true)}
+          <div className="ml-2">
+            {renderSingleSyncStatus()}
           </div>
         </div>
         <button 
@@ -163,7 +181,7 @@ export default function Sidebar() {
       {/* Backdrop overlay for mobile */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-black/70 z-40 lg:hidden transition-opacity duration-200"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -180,9 +198,8 @@ export default function Sidebar() {
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-wide leading-tight">Stocko</span>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {renderConnectionStatus()}
-                {renderSyncStatus(false)}
+              <div className="mt-1">
+                {renderSingleSyncStatus()}
               </div>
             </div>
           </div>
@@ -193,14 +210,6 @@ export default function Sidebar() {
           >
             <X className="w-5 h-5 text-white/70" />
           </button>
-        </div>
-
-        {/* Striped decorative bar */}
-        <div className="h-1.5 w-full flex">
-          <div className="w-1/4 bg-[#E84A27]"></div>
-          <div className="w-1/4 bg-[#E8A827]"></div>
-          <div className="w-1/4 bg-[#27A862]"></div>
-          <div className="w-1/4 bg-[#E84A27]"></div>
         </div>
 
         {/* Scrollable menu content */}
@@ -263,13 +272,21 @@ export default function Sidebar() {
         </div>
 
         {/* Footer Info */}
-        <div className="p-5 border-t border-white/5 bg-black/15 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="font-bold text-white/95 text-[14px] truncate leading-tight" title={profile.name}>
-              {profile.name}
+        <div className="p-4 border-t border-white/5 bg-black/15 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Circular Avatar */}
+            <div className="w-10 h-10 rounded-full bg-brand-accent/25 border border-brand-accent/30 text-brand-accent flex items-center justify-center font-bold text-sm shrink-0">
+              {getInitials(profile.name)}
             </div>
-            <div className="text-[11px] text-white/45 font-medium truncate mt-1">
-              {profile.sector} · {profile.city}
+            
+            {/* Info */}
+            <div className="min-w-0">
+              <div className="font-bold text-white/95 text-[14px] truncate leading-tight" title={profile.name}>
+                {profile.name}
+              </div>
+              <div className="text-[11px] text-white/45 font-medium truncate mt-0.5" title={profile.city}>
+                {profile.city}
+              </div>
             </div>
           </div>
           
@@ -279,10 +296,10 @@ export default function Sidebar() {
                 await supabase.auth.signOut();
                 window.location.href = "/connexion";
               }}
-              className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-transparent transition-all duration-300 ease-out active:scale-95 cursor-pointer flex items-center justify-center shadow-sm group relative"
+              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-transparent transition-all duration-200 ease-out active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
               title="Déconnexion"
             >
-              <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+              <LogOut className="w-4 h-4" />
             </button>
           )}
         </div>

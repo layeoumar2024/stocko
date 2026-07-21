@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
   ArrowLeftRight, 
   Search, 
@@ -12,7 +13,12 @@ import {
   User,
   Package,
   AlertCircle,
-  X
+  X,
+  ArrowDownRight,
+  ArrowUpRight,
+  ChevronDown,
+  ChevronUp,
+  Check
 } from "lucide-react";
 import { useStock, InsufficientStockError } from "@/context/StockContext";
 
@@ -26,6 +32,7 @@ export default function MouvementsPage() {
   const [quantity, setQuantity] = useState(1);
   const [date, setDate] = useState("");
   const [note, setNote] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
 
   // UI state
   const [showDropdown, setShowDropdown] = useState(false);
@@ -116,17 +123,17 @@ export default function MouvementsPage() {
   const recentMovements = movements.slice(0, 5);
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 lg:p-12 max-w-5xl mx-auto flex flex-col space-y-8 animate-fade-in">
+    <div className="min-h-screen p-4 sm:p-8 lg:p-12 max-w-6xl mx-auto flex flex-col space-y-8 animate-fade-in">
       {/* Page Header */}
       <div>
         <div className="text-xs font-bold tracking-widest text-[#8A7F6E] uppercase mb-1">
-          Saisie au comptoir
+          Gestion du stock
         </div>
         <h1 className="text-3xl font-extrabold text-brand-blue flex items-center gap-2">
-          Mouvement de Stock
+          Nouveau mouvement
         </h1>
         <p className="text-sm text-[#8A7F6E] mt-1 font-medium">
-          Enregistrez les entrées et sorties de marchandises instantanément.
+          Enregistrez une entrée ou une sortie de marchandise.
         </p>
       </div>
 
@@ -147,17 +154,17 @@ export default function MouvementsPage() {
           className="lg:col-span-3 bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm space-y-6 animate-slide-up"
         >
           {/* Product Autocomplete Selection */}
-          <div className="space-y-1.5 relative">
-            <label className="text-xs font-bold text-[#8A7F6E] uppercase flex items-center gap-1.5">
-              <Package className="w-3.5 h-3.5" />
-              Sélectionner le Produit
+          <div className="space-y-2 relative">
+            <label className="text-xs font-bold text-[#8A7F6E] uppercase flex items-center gap-1.5 select-none">
+              <Package className="w-3.5 h-3.5 text-[#8A7F6E]" />
+              Produit
             </label>
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A7F6E]" />
               <input
                 required
                 type="text"
-                placeholder="Rechercher par nom..."
+                placeholder="Rechercher par nom ou référence"
                 value={searchQuery}
                 onFocus={() => setShowDropdown(true)}
                 onChange={(e) => {
@@ -165,13 +172,20 @@ export default function MouvementsPage() {
                   setSelectedProductId(""); // clear selection while typing
                   setShowDropdown(true);
                 }}
-                className="w-full bg-[#FAF6EE]/50 border border-[#E5E0D5] rounded-xl pl-11 pr-4 py-3 text-[15px] font-semibold text-brand-blue placeholder-[#8A7F6E]/60 focus:outline-none focus:border-brand-accent transition-colors"
+                className="w-full bg-white border border-[#E5E0D5] rounded-xl pl-11 pr-24 py-3.5 text-[15px] font-semibold text-brand-blue placeholder-[#8A7F6E]/50 focus:outline-none focus:border-brand-accent transition-colors"
               />
-              {selectedProductId && (
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs bg-[#EDFBF3] text-[#0A8543] px-2 py-0.5 rounded font-bold border border-green-200">
-                  Sélectionné
-                </span>
-              )}
+              {selectedProductId ? (
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setSelectedProductId("");
+                    setSearchQuery("");
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-xs bg-brand-accent/20 hover:bg-brand-accent/30 text-brand-blue font-bold px-3 py-1 rounded-lg transition-colors cursor-pointer"
+                >
+                  Changer
+                </button>
+              ) : null}
             </div>
 
             {/* Dropdown list of matching products */}
@@ -208,76 +222,87 @@ export default function MouvementsPage() {
             )}
           </div>
 
-          {/* Movement Type Buttons */}
+          {/* Type de flux */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-[#8A7F6E] uppercase flex items-center gap-1.5">
-              <ArrowLeftRight className="w-3.5 h-3.5" />
+            <label className="text-xs font-bold text-[#8A7F6E] uppercase flex items-center gap-1.5 select-none">
+              <ArrowLeftRight className="w-3.5 h-3.5 text-[#8A7F6E]" />
               Type de flux
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Sortie */}
               <button
                 type="button"
                 onClick={() => setMovementType("Sortie")}
-                className={`py-4 px-3 rounded-xl font-bold text-[15px] transition-all duration-300 active:scale-[0.98] ${
+                className={`flex flex-col items-center justify-center py-4 px-3 rounded-xl transition-all duration-200 cursor-pointer ${
                   movementType === "Sortie"
-                    ? "bg-[#F6F0FF] text-[#6E3FF3] border-2 border-[#6E3FF3] shadow-md shadow-[#6E3FF3]/5"
-                    : "bg-[#FAF6EE] text-[#8A7F6E] border border-[#E5E0D5] hover:bg-[#F0EAE0]"
+                    ? "bg-[#FFF0F0] text-[#D9381E] border-2 border-[#D9381E] ring-1 ring-[#D9381E]/20"
+                    : "bg-white text-brand-blue border border-[#E5E0D5] hover:bg-[#FAF6EE]/50"
                 }`}
               >
-                Sortie (Vente / Perte)
+                <ArrowDownRight className="w-5 h-5 mb-1" />
+                <span className="font-bold text-[15px]">Sortie</span>
+                <span className="text-[11px] opacity-75 font-semibold mt-0.5">Vente, perte</span>
               </button>
+              {/* Entrée */}
               <button
                 type="button"
                 onClick={() => setMovementType("Entrée")}
-                className={`py-4 px-3 rounded-xl font-bold text-[15px] transition-all duration-300 active:scale-[0.98] ${
+                className={`flex flex-col items-center justify-center py-4 px-3 rounded-xl transition-all duration-200 cursor-pointer ${
                   movementType === "Entrée"
-                    ? "bg-[#EDFBF3] text-[#0A8543] border-2 border-[#0A8543] shadow-md shadow-[#0A8543]/5"
-                    : "bg-[#FAF6EE] text-[#8A7F6E] border border-[#E5E0D5] hover:bg-[#F0EAE0]"
+                    ? "bg-[#EDFBF3] text-[#0A8543] border-2 border-[#0A8543] ring-1 ring-[#0A8543]/20"
+                    : "bg-white text-brand-blue border border-[#E5E0D5] hover:bg-[#FAF6EE]/50"
                 }`}
               >
-                Entrée (Réapprovisionnement)
+                <ArrowUpRight className="w-5 h-5 mb-1" />
+                <span className="font-bold text-[15px]">Entrée</span>
+                <span className="text-[11px] opacity-75 font-semibold mt-0.5">Réapprovisionnement</span>
               </button>
             </div>
           </div>
 
-          {/* Quantity Input with adjusters */}
+          {/* Quantité */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-[#8A7F6E] uppercase">Quantité</label>
+            <label className="text-xs font-bold text-[#8A7F6E] uppercase select-none">Quantité</label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => adjustQty(-1)}
-                className="w-12 h-12 bg-[#FAF6EE] hover:bg-[#F0EAE0] border border-[#E5E0D5] rounded-xl flex items-center justify-center font-bold text-brand-blue transition-colors active:scale-95 cursor-pointer"
+                className="w-14 h-14 bg-white hover:bg-[#FAF6EE] border border-[#E5E0D5] text-brand-blue font-bold rounded-xl flex items-center justify-center cursor-pointer transition-colors select-none shadow-xs active:scale-95"
               >
                 <Minus className="w-4 h-4" />
               </button>
               
-              <input
-                required
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                className="flex-1 bg-[#FAF6EE]/50 border border-[#E5E0D5] rounded-xl py-3 text-center text-lg font-bold text-brand-blue focus:outline-none focus:border-brand-accent transition-colors"
-              />
+              <div className="flex-1 bg-white border border-[#E5E0D5] rounded-xl flex items-center justify-between px-6 h-14 focus-within:border-brand-accent transition-colors">
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full text-center text-xl font-extrabold text-brand-blue bg-transparent focus:outline-none"
+                />
+                <span className="flex items-center gap-1 border-l border-[#E5E0D5] pl-4 text-xs font-semibold text-[#8A7F6E] uppercase select-none whitespace-nowrap h-5">
+                  {selectedProduct?.unit || "unités"}
+                </span>
+              </div>
 
               <button
                 type="button"
                 onClick={() => adjustQty(1)}
-                className="w-12 h-12 bg-[#FAF6EE] hover:bg-[#F0EAE0] border border-[#E5E0D5] rounded-xl flex items-center justify-center font-bold text-brand-blue transition-colors active:scale-95 cursor-pointer"
+                className="w-14 h-14 bg-white hover:bg-[#FAF6EE] border border-[#E5E0D5] text-brand-blue font-bold rounded-xl flex items-center justify-center cursor-pointer transition-colors select-none shadow-xs active:scale-95"
               >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
             
-            {/* Quick selectors for fast tablet typing */}
+            {/* Quick selectors */}
             <div className="flex gap-2 pt-1.5 overflow-x-auto select-none">
-              {[+5, +10, +25, +50].map((val) => (
+              {[5, 10, 25, 50].map((val) => (
                 <button
                   key={val}
                   type="button"
                   onClick={() => adjustQty(val)}
-                  className="bg-[#FAF6EE] hover:bg-[#F0EAE0] border border-[#E5E0D5]/60 text-xs font-extrabold text-[#8A7F6E] hover:text-brand-blue px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  className="bg-[#FAF6EE] hover:bg-[#F0EAE0] border border-[#E5E0D5]/60 text-xs font-extrabold text-[#8A7F6E] hover:text-brand-blue px-3.5 py-2 rounded-lg transition-colors cursor-pointer"
                 >
                   +{val}
                 </button>
@@ -285,98 +310,144 @@ export default function MouvementsPage() {
             </div>
           </div>
 
-          {/* Date & Note Inputs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Date */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#8A7F6E] uppercase flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                Date d'effet
-              </label>
-              <input
-                required
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-[#FAF6EE]/50 border border-[#E5E0D5] rounded-xl px-4 py-3 text-sm font-semibold text-brand-blue focus:outline-none focus:border-brand-accent transition-colors"
-              />
-            </div>
+          {/* Accordion collapsible details section */}
+          <div className="border-t border-[#FAF6EE] pt-4">
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full flex items-center justify-between py-2 text-sm font-bold text-[#8A7F6E] hover:text-brand-blue transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                Date, note et détails
+              </span>
+            </button>
 
-            {/* Note */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#8A7F6E] uppercase flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" />
-                Note (Client, Fournisseur...)
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Client Oumar"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="w-full bg-[#FAF6EE]/50 border border-[#E5E0D5] rounded-xl px-4 py-3 text-sm font-semibold text-brand-blue placeholder-[#8A7F6E]/50 focus:outline-none focus:border-brand-accent transition-colors"
-              />
-            </div>
+            {showDetails && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 animate-slide-up">
+                {/* Date */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#8A7F6E] uppercase flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#8A7F6E]" />
+                    Date d'effet
+                  </label>
+                  <input
+                    required
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full bg-[#FAF6EE]/50 border border-[#E5E0D5] rounded-xl px-4 py-3.5 text-sm font-semibold text-brand-blue focus:outline-none focus:border-brand-accent transition-colors"
+                  />
+                </div>
+
+                {/* Note */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#8A7F6E] uppercase flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#8A7F6E]" />
+                    Note (Client, Fournisseur...)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Client Oumar"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="w-full bg-[#FAF6EE]/50 border border-[#E5E0D5] rounded-xl px-4 py-3.5 text-sm font-semibold text-brand-blue placeholder-[#8A7F6E]/50 focus:outline-none focus:border-brand-accent transition-colors"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Validation Button */}
-          <button
-            type="submit"
-            disabled={!selectedProductId}
-            className={`w-full py-4 rounded-xl font-extrabold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] ${
-              selectedProductId 
-                ? "bg-brand-blue text-white hover:bg-[#1a2c4e] hover:shadow-md cursor-pointer" 
-                : "bg-[#E5E0D5] text-[#8A7F6E]/60 cursor-not-allowed"
-            }`}
-          >
-            Enregistrer le mouvement
-          </button>
+          <div>
+            <button
+              type="submit"
+              disabled={!selectedProductId}
+              className={`w-full py-4 rounded-xl font-extrabold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] ${
+                selectedProductId 
+                  ? "bg-brand-blue text-white hover:bg-[#1a2c4e] hover:shadow-md cursor-pointer" 
+                  : "bg-[#EAE5D9] text-[#8A7F6E]/55 cursor-not-allowed border border-[#E5E0D5]/50"
+              }`}
+            >
+              <Check className="w-4 h-4" />
+              Enregistrer le mouvement
+            </button>
+            {!selectedProductId && (
+              <div className="text-center text-[13px] text-[#8A7F6E] font-medium mt-3 select-none">
+                Sélectionnez d'abord un produit
+              </div>
+            )}
+          </div>
         </form>
 
         {/* Right Column: Recent Activity Feed (2 cols) */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm flex flex-col animate-slide-up [animation-delay:50ms]">
-            <h3 className="text-lg font-bold text-brand-blue pb-4 border-b border-[#FAF6EE] mb-4">
-              Mouvements récents
-            </h3>
-            
-            <div className="divide-y divide-[#FAF6EE] min-h-[300px]">
-              {recentMovements.length > 0 ? (
-                recentMovements.map((mov) => (
-                  <div key={mov.id} className="flex items-center justify-between py-3.5">
-                    <div className="flex items-center gap-3">
-                      {mov.type === "Sortie" ? (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-extrabold bg-[#F6F0FF] text-[#6E3FF3]">
-                          Sortie
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-extrabold bg-[#EDFBF3] text-[#0A8543]">
-                          Entrée
-                        </span>
-                      )}
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-brand-blue text-sm truncate max-w-[150px]">{mov.productName}</span>
-                        <span className="text-[10px] text-[#8A7F6E] font-semibold">{mov.note || "Mouvement"}</span>
-                      </div>
-                    </div>
+          <div className="bg-white border border-[#E5E0D5]/65 rounded-2xl p-6 shadow-sm flex flex-col justify-between h-full animate-slide-up [animation-delay:50ms]">
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-[#FAF6EE] mb-4">
+                <h3 className="text-base sm:text-lg font-bold text-brand-blue">
+                  Mouvements récents
+                </h3>
+                <Link href="/mouvements" className="text-xs font-bold text-[#8A7F6E] hover:text-brand-blue flex items-center gap-1 transition-colors">
+                  Historique →
+                </Link>
+              </div>
 
-                    <div className="text-right">
-                      <span className={`font-extrabold text-sm block ${mov.type === "Sortie" ? "text-brand-blue" : "text-[#0A8543]"}`}>
-                        {mov.type === "Sortie" ? `-${mov.quantity}` : `+${mov.quantity}`}
-                      </span>
-                      <span className="text-[9px] text-[#8A7F6E] font-medium">
-                        {new Date(mov.time).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
+              <div className="text-[10px] font-bold text-[#8A7F6E]/80 tracking-wider mb-3 select-none uppercase">
+                Aujourd'hui
+              </div>
+              
+              <div className="divide-y divide-[#FAF6EE]">
+                {recentMovements.length > 0 ? (
+                  recentMovements.map((mov) => {
+                    const timeStr = new Date(mov.time).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                    const userStr = mov.user || "Oumar";
+                    const noteStr = mov.note || (mov.type === "Sortie" ? "Vente comptoir" : "Livraison");
+
+                    return (
+                      <div key={mov.id} className="flex items-center justify-between py-3.5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Circular arrow badges */}
+                          {mov.type === "Sortie" ? (
+                            <div className="w-9 h-9 rounded-full bg-[#FFF0F0] text-[#D9381E] flex items-center justify-center shrink-0 shadow-xs">
+                              <ArrowDownRight className="w-4 h-4" />
+                            </div>
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-[#EDFBF3] text-[#0A8543] flex items-center justify-center shrink-0 shadow-xs">
+                              <ArrowUpRight className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-brand-blue text-sm truncate max-w-[170px]">{mov.productName}</span>
+                            <span className="text-[10px] text-[#8A7F6E] font-semibold mt-0.5 truncate max-w-[200px]">
+                              {mov.type} · {timeStr} · {userStr} · {noteStr}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className={`font-extrabold text-[15px] block pl-2 shrink-0 ${mov.type === "Sortie" ? "text-[#D9381E]" : "text-[#0A8543]"}`}>
+                          {mov.type === "Sortie" ? `-${mov.quantity}` : `+${mov.quantity}`}
+                        </span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-[#8A7F6E] space-y-1.5">
+                    <ArrowLeftRight className="w-8 h-8 text-[#8A7F6E]/30" />
+                    <span className="font-bold text-sm text-brand-blue">Aucun flux</span>
+                    <span className="text-[11px]">Saisissez un mouvement pour le voir ici.</span>
                   </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-[#8A7F6E] space-y-1.5">
-                  <ArrowLeftRight className="w-8 h-8 text-[#8A7F6E]/30" />
-                  <span className="font-bold text-sm text-brand-blue">Aucun flux</span>
-                  <span className="text-[11px]">Saisissez un mouvement pour le voir ici.</span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
+
+            {recentMovements.length > 0 && (
+              <div className="text-center pt-4 border-t border-[#FAF6EE] mt-6">
+                <Link href="/mouvements" className="text-xs font-bold text-brand-blue/70 hover:text-brand-blue transition-colors">
+                  Voir les {movements.length} mouvements de la semaine
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
