@@ -9,8 +9,8 @@ export default function LandingFaq() {
   const faqs = [
     {
       id: 1,
-      question: "Puis-je utiliser Stocko sans connexion internet ?",
-      answer: "Oui, Stocko possède un mode hors-ligne complet. Vous pouvez continuer à enregistrer vos ventes et mouvements de stock au comptoir. L'application synchronisera automatiquement vos données en arrière-plan dès que vous retrouverez un accès réseau (même faible comme la 2G)."
+      question: "Puis-je utiliser Denka sans connexion internet ?",
+      answer: "Oui, Denka possède un mode hors-ligne complet. Vous pouvez continuer à enregistrer vos ventes et mouvements de stock au comptoir. L'application synchronisera automatiquement vos données en arrière-plan dès que vous retrouverez un accès réseau (même faible comme la 2G)."
     },
     {
       id: 2,

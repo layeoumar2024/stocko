@@ -162,9 +162,9 @@ export default function Sidebar() {
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-brand-blue text-white flex items-center justify-between px-5 z-30 border-b border-white/10 select-none">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-brand-accent rounded-lg flex items-center justify-center font-extrabold text-[#111E35] text-lg shadow-sm">
-            S
+            D
           </div>
-          <span className="text-lg font-bold tracking-wide">Stocko</span>
+          <span className="text-lg font-bold tracking-wide">Denka</span>
           <div className="ml-2">
             {renderSingleSyncStatus()}
           </div>
@@ -194,10 +194,10 @@ export default function Sidebar() {
         <div className="p-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-brand-accent rounded-lg flex items-center justify-center font-extrabold text-[#111E35] text-xl shadow-md">
-              S
+              D
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-bold tracking-wide leading-tight">Stocko</span>
+              <span className="text-xl font-bold tracking-wide leading-tight">Denka</span>
               <div className="mt-1">
                 {renderSingleSyncStatus()}
               </div>

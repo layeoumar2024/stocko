@@ -34,7 +34,7 @@ export default function LandingHeader() {
           {/* Logo */}
           <Link href="/" className="landing-logo">
             <Boxes className="w-7 h-7 sm:w-8 sm:h-8 text-[#fd761a]" />
-            <span>Stocko</span>
+            <span>Denka</span>
           </Link>
 
           {/* Desktop Nav */}
@@ -91,7 +91,7 @@ export default function LandingHeader() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <Boxes className="w-7 h-7 text-[#fd761a]" />
-                <span className="text-xl">Stocko</span>
+                <span className="text-xl">Denka</span>
               </Link>
               <button
                 onClick={() => setMobileMenuOpen(false)}

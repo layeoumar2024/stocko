@@ -36,7 +36,7 @@ export default function LandingHero() {
           </h1>
           
           <p className="landing-hero-desc">
-            Stocko est la solution intelligente pour les commerçants africains. Suivez vos ventes, gérez vos fournisseurs et recevez des alertes automatiques même avec une connexion 2G.
+            Denka est la solution intelligente pour les commerçants africains. Suivez vos ventes, gérez vos fournisseurs et recevez des alertes automatiques même avec une connexion 2G.
           </p>
 
           <div className="landing-hero-buttons">
@@ -72,7 +72,7 @@ export default function LandingHero() {
                   <div className="w-8 h-8 bg-[#fd761a] rounded-lg flex items-center justify-center shadow-sm">
                     <Boxes className="w-5 h-5 text-white" />
                   </div>
-                  <span className="text-white font-bold text-lg">Stocko</span>
+                  <span className="text-white font-bold text-lg">Denka</span>
                 </div>
                 
                 {/* Menu */}

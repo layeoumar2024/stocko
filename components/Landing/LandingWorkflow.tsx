@@ -17,7 +17,7 @@ export default function LandingWorkflow() {
     {
       num: 3,
       title: "Commencez à vendre",
-      desc: "Enregistrez vos premières ventes et laissez Stocko s'occuper du reste."
+      desc: "Enregistrez vos premières ventes et laissez Denka s'occuper du reste."
     }
   ];
 

@@ -3,8 +3,17 @@ import "./globals.css";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
-  title: "Stocko — Gestion de stock intelligente pour l'Afrique",
+  title: "Denka — Gestion de stock intelligente pour l'Afrique",
   description: "Solution moderne de gestion de stock pour PME et grossistes en Afrique francophone.",
+  openGraph: {
+    title: "Denka — Gestion de stock intelligente pour l'Afrique",
+    description: "Solution moderne de gestion de stock pour PME et grossistes en Afrique francophone.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Denka — Gestion de stock intelligente pour l'Afrique",
+    description: "Solution moderne de gestion de stock pour PME et grossistes en Afrique francophone.",
+  }
 };
 
 export default function RootLayout({

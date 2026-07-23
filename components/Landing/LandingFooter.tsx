@@ -13,7 +13,7 @@ export default function LandingFooter() {
         <div className="landing-footer-col">
           <div className="flex items-center gap-2">
             <Boxes className="w-6 h-6 text-[#fd761a]" />
-            <span className="font-extrabold text-xl text-[#003527]">Stocko</span>
+            <span className="font-extrabold text-xl text-[#003527]">Denka</span>
           </div>
           <p className="landing-footer-desc">
             La gestion de stock intelligente, pensée pour les commerçants, détaillants et grossistes du continent africain.
@@ -55,7 +55,7 @@ export default function LandingFooter() {
 
       {/* Bottom info */}
       <div className="landing-footer-bottom">
-        <p>© 2026 Stocko. Fait avec fierté en Afrique.</p>
+        <p>© 2026 Denka. Fait avec fierté en Afrique.</p>
         <div className="landing-footer-socials">
           <a href="#" className="landing-footer-social-link">Twitter</a>
           <a href="#" className="landing-footer-social-link">LinkedIn</a>

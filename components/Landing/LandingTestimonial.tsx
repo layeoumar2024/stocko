@@ -21,7 +21,7 @@ export default function LandingTestimonial() {
           <div className="space-y-6 text-center md:text-left flex-1">
             <Quote className="w-10 h-10 text-[#fd761a] mx-auto md:mx-0 transform rotate-180" />
             <p className="landing-testimonial-quote">
-              "Depuis que j'utilise Stocko, j'ai réduit mes pertes de 40%. Je peux voyager tout en surveillant mes trois boutiques depuis mon téléphone. C'est l'outil que chaque commerçant sénégalais devrait avoir."
+              "Depuis que j'utilise Denka, j'ai réduit mes pertes de 40%. Je peux voyager tout en surveillant mes trois boutiques depuis mon téléphone. C'est l'outil que chaque commerçant sénégalais devrait avoir."
             </p>
             <div>
               <p className="font-extrabold text-lg text-[#003527]">Moussa Diop</p>

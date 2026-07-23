@@ -11,7 +11,7 @@ export default function LandingCta() {
           Prêt à transformer votre business ?
         </h2>
         <p className="landing-cta-final-desc">
-          Rejoignez plus de 2 000 commerçants et grossistes qui font confiance à Stocko pour optimiser leur gestion quotidienne.
+          Rejoignez plus de 2 000 commerçants et grossistes qui font confiance à Denka pour optimiser leur gestion quotidienne.
         </p>
         <div className="landing-cta-final-buttons">
           <Link href="/connexion?mode=onboarding" className="landing-btn-cta-primary">
