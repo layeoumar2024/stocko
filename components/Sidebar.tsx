@@ -12,7 +12,8 @@ import {
   LineChart,
   Menu,
   X,
-  LogOut
+  LogOut,
+  ShoppingBag
 } from "lucide-react";
 
 import { useStock } from "@/context/StockContext";
@@ -142,6 +143,11 @@ export default function Sidebar() {
       name: "Mouvement de stock",
       href: "/mouvements",
       icon: ArrowLeftRight,
+    },
+    {
+      name: "Vente Rapide",
+      href: "/ventes",
+      icon: ShoppingBag,
     },
     {
       name: "Alertes",
